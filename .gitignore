@@ -1,0 +1,44 @@
+# Central Traefik deployment — separate repository, not part of this monorepo
+/traefik/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.turbo/
+
+# Environment files (examples are committed, real files are not)
+env.local
+env.prod
+.env
+.env.*
+!env.local.example
+!env.prod.example
+
+# Data & artifacts
+*.log
+data/
+.playwright/
+.scrapy/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
