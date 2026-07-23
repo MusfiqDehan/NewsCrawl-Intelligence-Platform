@@ -1,0 +1,25 @@
+# Scrape targets for the CENTRAL monitoring stack (traefik/monitoring).
+# Append these jobs to traefik/monitoring/prometheus/prometheus.yml and attach
+# the central Prometheus container to the newscrawl_internal network:
+#
+#   docker network connect newscrawl_internal prometheus
+#
+# (or add `newscrawl_internal` as an external network on the prometheus
+# service in docker-compose.monitoring.yml).
+
+scrape_configs:
+  - job_name: newscrawl-api
+    metrics_path: /api/v1/metrics
+    static_configs:
+      - targets: ["newscrawl-api:8000"]
+
+  - job_name: newscrawl-crawler
+    static_configs:
+      - targets: ["newscrawl-crawler-1:9101"]
+
+  - job_name: newscrawl-processors
+    static_configs:
+      - targets:
+          - "newscrawl-processor-cleaning-1:9102"
+          - "newscrawl-processor-llm-1:9103"
+          - "newscrawl-processor-embedding-1:9104"

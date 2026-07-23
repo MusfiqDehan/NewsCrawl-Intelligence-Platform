@@ -1,0 +1,34 @@
+# NewsCrawl processor — cleaning / LLM / embedding workers (one image, three
+# entrypoints selected via the container command).
+# Build from the repository root:
+#   docker build -f infrastructure/docker/Dockerfile.processor .
+
+FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim AS builder
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
+WORKDIR /app
+
+COPY pyproject.toml uv.lock ./
+COPY apps/api/pyproject.toml apps/api/
+COPY apps/crawler/pyproject.toml apps/crawler/
+COPY apps/processor/pyproject.toml apps/processor/
+COPY packages/contracts/pyproject.toml packages/contracts/
+COPY packages/crawler-utils/pyproject.toml packages/crawler-utils/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-workspace \
+    --package newscrawl-processor --package newscrawl-api
+
+COPY packages/ packages/
+COPY apps/api/ apps/api/
+COPY apps/processor/ apps/processor/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --package newscrawl-processor --package newscrawl-api
+
+FROM python:3.14-slim-bookworm
+RUN groupadd -r newscrawl && useradd -r -g newscrawl -m newscrawl
+WORKDIR /app
+COPY --from=builder --chown=newscrawl:newscrawl /app /app
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 \
+    HF_HOME=/home/newscrawl/.cache/huggingface
+USER newscrawl
+EXPOSE 9102 9103 9104
+CMD ["python", "-m", "newscrawl_processor.run_worker"]

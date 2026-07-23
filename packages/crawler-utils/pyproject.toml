@@ -1,0 +1,15 @@
+[project]
+name = "newscrawl-crawler-utils"
+version = "0.1.0"
+description = "Shared crawling utilities: URL normalization, content hashing, SimHash, text normalization"
+requires-python = ">=3.14"
+dependencies = [
+    "w3lib>=2.3",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["newscrawl_crawler_utils"]

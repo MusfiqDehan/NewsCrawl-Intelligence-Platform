@@ -1,0 +1,127 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# NewsCrawl Intelligence Platform — LOCAL development stack
+#
+# Usage:
+#   cp env.local.example env.local        # once
+#   docker compose --env-file env.local -f docker-compose.local.yml up -d
+# or simply:
+#   make dev
+#
+# App services (api, web, crawler, processor) can run either in containers
+# (profile "apps") or directly on the host against this infrastructure.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: newscrawl-local
+
+services:
+  # ── Infrastructure ──────────────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: newscrawl-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-newscrawl}
+      POSTGRES_USER: ${POSTGRES_USER:-newscrawl}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-newscrawl-local-dev}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-newscrawl} -d ${POSTGRES_DB:-newscrawl}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    container_name: newscrawl-redis
+    restart: unless-stopped
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+      - ./infrastructure/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: newscrawl-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-newscrawl}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-newscrawl-local-dev}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # One-shot bucket bootstrap
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD} &&
+      mc mb --ignore-existing local/$${BUCKET} &&
+      exit 0
+      "
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-newscrawl}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-newscrawl-local-dev}
+      BUCKET: ${S3_BUCKET_RAW_HTML:-newscrawl-raw-html}
+
+  # ── Local observability (prod uses the central monitoring stack) ────────────
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: newscrawl-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./infrastructure/prometheus/prometheus.local.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    ports:
+      - "9090:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana-oss:12.1.0
+    container_name: newscrawl-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  prometheus_data:
+  grafana_data:
