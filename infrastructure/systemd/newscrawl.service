@@ -1,0 +1,25 @@
+# NewsCrawl production stack as a systemd unit.
+# Install:
+#   sudo cp infrastructure/systemd/newscrawl.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now newscrawl
+#
+# The whole stack is compose-managed; systemd guarantees it comes back after
+# host reboots and gives one place to start/stop/inspect it.
+
+[Unit]
+Description=NewsCrawl Intelligence Platform (docker compose stack)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/newscrawl
+ExecStart=/usr/bin/docker compose --env-file env.prod -f docker-compose.prod.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose --env-file env.prod -f docker-compose.prod.yml down
+ExecReload=/usr/bin/docker compose --env-file env.prod -f docker-compose.prod.yml up -d --remove-orphans
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target

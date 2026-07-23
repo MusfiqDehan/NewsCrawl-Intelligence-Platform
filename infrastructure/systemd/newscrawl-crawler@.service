@@ -1,0 +1,26 @@
+# Optional: run extra crawl workers directly on the host (outside compose)
+# when scaling beyond the containerised crawler, e.g.:
+#   sudo systemctl start newscrawl-crawler@1 newscrawl-crawler@2
+#
+# Assumes the repo is checked out at /opt/newscrawl with a synced uv venv.
+
+[Unit]
+Description=NewsCrawl crawl worker %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=newscrawl
+WorkingDirectory=/opt/newscrawl
+EnvironmentFile=/opt/newscrawl/env.prod
+Environment=CRAWLER_METRICS_PORT=91%i
+ExecStart=/opt/newscrawl/.venv/bin/python -m newscrawl_crawler.run_worker
+Restart=on-failure
+RestartSec=10
+# Give in-flight spider passes time to finish cleanly (SIGTERM handling).
+TimeoutStopSec=120
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target
