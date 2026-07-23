@@ -1,0 +1,27 @@
+# Local-dev Prometheus. In production the central monitoring stack scrapes the
+# services instead (see infrastructure/prometheus/newscrawl-scrape-config.yml).
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # API and workers run either on the host (make dev) or in containers.
+  - job_name: newscrawl-api
+    static_configs:
+      - targets: ["host.docker.internal:8000"]
+    metrics_path: /api/v1/metrics
+
+  - job_name: newscrawl-crawler
+    static_configs:
+      - targets: ["host.docker.internal:9101"]
+
+  - job_name: newscrawl-processor
+    static_configs:
+      - targets:
+          - "host.docker.internal:9102" # cleaning worker
+          - "host.docker.internal:9103" # LLM worker
+          - "host.docker.internal:9104" # embedding worker
