@@ -1,0 +1,160 @@
+"use client";
+
+import { formatDistanceToNow } from "date-fns";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
+
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  Input,
+  Select,
+  Spinner,
+  StatusBadge,
+} from "@/components/ui";
+import { useArticles, useSources } from "@/lib/hooks";
+import type { ArticleSummary } from "@/lib/types";
+import { formatNumber } from "@/lib/utils";
+
+function ArticleRow({ article, sourceName }: { article: ArticleSummary; sourceName: string }) {
+  return (
+    <Link
+      href={`/articles/${article.id}`}
+      className="block rounded-xl border border-slate-800 bg-slate-900/60 p-4 transition-colors hover:border-slate-700 hover:bg-slate-900"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h3 className="truncate font-medium text-white">{article.title}</h3>
+          {article.summary && (
+            <p className="mt-1 line-clamp-2 text-sm text-slate-400">{article.summary}</p>
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <span className="font-medium text-slate-400">{sourceName}</span>
+            {article.author && <span>· {article.author}</span>}
+            {article.category && <span>· {article.category}</span>}
+            <span>· {formatNumber(article.word_count)} words</span>
+            {article.published_at && (
+              <span>
+                · {formatDistanceToNow(new Date(article.published_at), { addSuffix: true })}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <StatusBadge status={article.language} />
+          {article.sentiment && (
+            <span className="text-xs text-slate-500">{article.sentiment}</span>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+export default function ArticlesPage() {
+  const [q, setQ] = useState("");
+  const [search, setSearch] = useState("");
+  const [sourceId, setSourceId] = useState("");
+  const [language, setLanguage] = useState("");
+  const [page, setPage] = useState(1);
+
+  const { data: sources } = useSources();
+  const { data, isLoading, error } = useArticles({
+    q: search || undefined,
+    source_id: sourceId || undefined,
+    language: language || undefined,
+    page,
+  });
+
+  const sourceName = (id: string) =>
+    sources?.find((s) => s.id === id)?.name ?? "Unknown";
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-xl font-semibold text-white">Article Explorer</h1>
+
+      <form
+        className="flex flex-wrap gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setPage(1);
+          setSearch(q);
+        }}
+      >
+        <Input
+          placeholder="Search titles…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="w-64"
+        />
+        <Select
+          value={sourceId}
+          onChange={(e) => {
+            setSourceId(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">All sources</option>
+          {sources?.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </Select>
+        <Select
+          value={language}
+          onChange={(e) => {
+            setLanguage(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">All languages</option>
+          <option value="bn">Bangla</option>
+          <option value="en">English</option>
+        </Select>
+        <Button type="submit" variant="outline">
+          Search
+        </Button>
+      </form>
+
+      {error && <ErrorState message={(error as Error).message} />}
+      {isLoading && <Spinner />}
+      {data && data.items.length === 0 && <EmptyState message="No articles found" />}
+
+      {data && data.items.length > 0 && (
+        <>
+          <div className="text-sm text-slate-500">
+            {formatNumber(data.total)} articles
+          </div>
+          <div className="space-y-3">
+            {data.items.map((a) => (
+              <ArticleRow key={a.id} article={a} sourceName={sourceName(a.source_id)} />
+            ))}
+          </div>
+          <div className="flex items-center justify-between pt-2">
+            <Button
+              variant="outline"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              <ChevronLeft className="h-4 w-4" /> Previous
+            </Button>
+            <span className="text-sm text-slate-500">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
