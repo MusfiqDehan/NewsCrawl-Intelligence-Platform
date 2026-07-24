@@ -34,4 +34,4 @@ RUN groupadd -r newscrawl && useradd -r -g newscrawl -m newscrawl \
     && chown -R newscrawl:newscrawl /app /ms-playwright
 USER newscrawl
 EXPOSE 9101
-CMD ["python", "-m", "newscrawl_crawler.run_worker"]
+CMD ["python", "-m", "newscrawl_crawler.run_worker", "--max-pages", "25", "--batch-size", "10", "--interval", "5"]
