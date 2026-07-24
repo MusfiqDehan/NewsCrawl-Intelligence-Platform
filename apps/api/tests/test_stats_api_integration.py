@@ -216,8 +216,10 @@ class TestAnalytics:
         response = await client.get("/api/v1/stats/sentiment", headers=admin_headers)
         assert response.status_code == 200
         buckets = {b["sentiment"]: b["count"] for b in response.json()}
+        assert set(buckets) == {"positive", "negative", "neutral", "not available"}
         assert buckets.get("positive", 0) >= 1
         assert buckets.get("negative", 0) >= 1
+        assert buckets["not available"] >= 0
 
     async def test_llm_daily_costs(
         self,
