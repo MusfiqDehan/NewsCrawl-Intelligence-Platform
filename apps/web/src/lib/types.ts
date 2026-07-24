@@ -130,6 +130,11 @@ export interface Overview {
   llm_tokens_total: number;
 }
 
+export interface SentimentBucket {
+  sentiment: string;
+  count: number;
+}
+
 export interface SourceHealth {
   source_id: string;
   name: string;
