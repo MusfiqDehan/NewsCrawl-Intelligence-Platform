@@ -4,6 +4,9 @@ Gemini is the default (google-genai SDK); OpenAI, Anthropic, and Ollama are
 implemented over their stable REST APIs with httpx — no extra SDK per vendor.
 Every provider returns the same LLMCompletion so the extractor is
 provider-agnostic, and a fallback chain is just a list of providers.
+
+Operators can run hybrid (cloud primary + Ollama fallback on 429/expiry) or
+local-only (`LLM_PROVIDER=ollama`, no API keys required).
 """
 
 from abc import ABC, abstractmethod
@@ -12,10 +15,27 @@ from typing import Any
 
 import httpx
 from newscrawl_api.config import Settings
+from newscrawl_api.observability import get_logger
+
+log = get_logger()
+
+# Local inference is slower than cloud APIs; never starve Ollama with a short timeout.
+_OLLAMA_MIN_TIMEOUT_SECONDS = 600.0
+
+# Keep local context modest so CPU hosts finish within the timeout.
+_OLLAMA_NUM_CTX = 1024
+_OLLAMA_NUM_PREDICT = 220
+
+# HTTP statuses where retrying the same provider is usually pointless.
+_NON_RETRYABLE_HTTP = frozenset({401, 403, 404, 429})
 
 
 class LLMProviderError(RuntimeError):
-    """Transport/API failure — retryable, and grounds for provider fallback."""
+    """Transport/API failure — grounds for retry and/or provider fallback."""
+
+    def __init__(self, message: str, *, retryable: bool = True) -> None:
+        super().__init__(message)
+        self.retryable = retryable
 
 
 @dataclass(frozen=True)
@@ -42,6 +62,25 @@ def completion_cost_usd(completion: LLMCompletion) -> float:
     return (
         completion.prompt_tokens * prompt_rate + completion.completion_tokens * completion_rate
     ) / 1_000_000
+
+
+def _looks_like_quota_or_auth_error(message: str, code: int | None = None) -> bool:
+    if code in _NON_RETRYABLE_HTTP:
+        return True
+    upper = message.upper()
+    return any(
+        needle in upper
+        for needle in (
+            "429",
+            "RESOURCE_EXHAUSTED",
+            "RATE_LIMIT",
+            "QUOTA",
+            "PERMISSION_DENIED",
+            "UNAUTHENTICATED",
+            "API_KEY_INVALID",
+            "EXPIRED",
+        )
+    )
 
 
 class LLMProvider(ABC):
@@ -82,7 +121,14 @@ class GeminiProvider(LLMProvider):
                 ),
             )
         except errors.APIError as exc:
-            raise LLMProviderError(f"gemini: {exc}") from exc
+            code = getattr(exc, "code", None)
+            if code is None:
+                code = getattr(exc, "status_code", None)
+            message = f"gemini: {exc}"
+            raise LLMProviderError(
+                message,
+                retryable=not _looks_like_quota_or_auth_error(message, code),
+            ) from exc
         usage = response.usage_metadata
         return LLMCompletion(
             text=response.text or "",
@@ -105,8 +151,17 @@ class _HttpProvider(LLMProvider):
         try:
             response = await self._http.post(path, json=json, headers=headers)
             response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            detail = (exc.response.text or "")[:300]
+            raise LLMProviderError(
+                f"{self.name}: HTTP {status} {detail or exc}",
+                retryable=status not in _NON_RETRYABLE_HTTP,
+            ) from exc
         except httpx.HTTPError as exc:
-            raise LLMProviderError(f"{self.name}: {exc}") from exc
+            raise LLMProviderError(
+                f"{self.name}: {type(exc).__name__}: {exc or 'request failed'}"
+            ) from exc
         data: dict[str, Any] = response.json()
         return data
 
@@ -206,7 +261,12 @@ class OllamaProvider(_HttpProvider):
                 ],
                 "format": "json",
                 "stream": False,
-                "options": {"temperature": 0.1},
+                "options": {
+                    "temperature": 0.1,
+                    "num_ctx": _OLLAMA_NUM_CTX,
+                    "num_predict": _OLLAMA_NUM_PREDICT,
+                    "num_thread": 6,
+                },
             },
             headers={},
         )
@@ -219,6 +279,19 @@ class OllamaProvider(_HttpProvider):
         )
 
 
+def provider_is_configured(name: str, settings: Settings) -> bool:
+    """True when the provider has the credentials/endpoint needed to run."""
+    if name == "gemini":
+        return bool(settings.gemini_api_key.strip())
+    if name == "openai":
+        return bool(settings.openai_api_key.strip())
+    if name == "anthropic":
+        return bool(settings.anthropic_api_key.strip())
+    if name == "ollama":
+        return bool(settings.ollama_base_url.strip())
+    return False
+
+
 def build_provider(name: str, settings: Settings) -> LLMProvider:
     timeout = settings.llm_timeout_seconds
     if name == "gemini":
@@ -228,18 +301,32 @@ def build_provider(name: str, settings: Settings) -> LLMProvider:
     if name == "anthropic":
         return AnthropicProvider(settings.anthropic_api_key, settings.anthropic_model, timeout)
     if name == "ollama":
-        return OllamaProvider(settings.ollama_base_url, settings.ollama_model, timeout)
+        ollama_timeout = max(timeout, _OLLAMA_MIN_TIMEOUT_SECONDS)
+        return OllamaProvider(settings.ollama_base_url, settings.ollama_model, ollama_timeout)
     raise ValueError(f"Unknown LLM provider: {name!r}")
 
 
 def build_provider_chain(settings: Settings) -> list[LLMProvider]:
-    """Primary provider followed by the configured fallbacks, deduplicated."""
-    names = [settings.llm_provider]
+    """Primary provider followed by configured fallbacks.
+
+    Skips providers missing API keys / base URL so local-only mode works with
+    empty cloud keys, and so a missing Gemini key does not block Ollama.
+    """
+    names = [settings.llm_provider.strip()]
     names += [n.strip() for n in settings.llm_fallback_providers.split(",") if n.strip()]
     seen: set[str] = set()
     chain: list[LLMProvider] = []
     for name in names:
-        if name not in seen:
-            seen.add(name)
-            chain.append(build_provider(name, settings))
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        if not provider_is_configured(name, settings):
+            log.warning("llm_provider_skipped_unconfigured", provider=name)
+            continue
+        chain.append(build_provider(name, settings))
+    if not chain:
+        raise ValueError(
+            "No configured LLM providers. Set LLM_PROVIDER=ollama with "
+            "OLLAMA_BASE_URL, or provide a cloud API key (e.g. GEMINI_API_KEY)."
+        )
     return chain
