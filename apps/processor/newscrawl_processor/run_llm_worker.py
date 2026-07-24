@@ -23,6 +23,7 @@ from redis.asyncio import Redis
 
 from newscrawl_processor.llm import ExtractionFailedError, LlmExtractor, build_provider_chain
 from newscrawl_processor.llm.extractor import LlmUsage
+from newscrawl_processor.llm.heuristic import heuristic_analysis
 from newscrawl_processor.llm.persist import apply_analysis, record_failure
 from newscrawl_processor.metrics import (
     LLM_COST,
@@ -77,18 +78,41 @@ class LlmWorker:
                     await self.queue.ack(message)
                     return
 
+                # Already extracted (e.g. after backlog replay) — don't burn provider quota.
+                if article.sentiment and article.summary:
+                    MESSAGES.labels(worker="llm", outcome="skipped").inc()
+                    await self.queue.ack(message)
+                    return
+
                 try:
                     analysis, usage = await self.extractor.analyze(
                         title=article.title, body=article.body, language=payload.language
                     )
                 except ExtractionFailedError as exc:
+                    # Provider outage / free-tier exhaustion: still fill sentiment
+                    # so dashboards are not stuck at "not available".
                     latency_ms = int((time.monotonic() - started) * 1000)
                     await record_failure(
                         db, article, exc.usage, error=str(exc), latency_ms=latency_ms
                     )
-                    MESSAGES.labels(worker="llm", outcome="failed").inc()
-                    self._track_usage(exc.usage)
-                    await self.queue.retry(message, error=str(exc))
+                    analysis = heuristic_analysis(
+                        title=article.title, body=article.body, language=payload.language
+                    )
+                    usage = LlmUsage(
+                        provider="heuristic",
+                        model="keyword-v1",
+                        attempts=exc.usage.attempts,
+                        errors=list(exc.usage.errors),
+                    )
+                    await apply_analysis(db, article, analysis, usage, latency_ms=latency_ms)
+                    MESSAGES.labels(worker="llm", outcome="heuristic").inc()
+                    await self.queue.ack(message)
+                    log.info(
+                        "article_analyzed_heuristic",
+                        article_id=str(payload.article_id),
+                        sentiment=analysis.sentiment,
+                        llm_errors=exc.usage.errors[-2:],
+                    )
                     return
 
                 latency_ms = int((time.monotonic() - started) * 1000)
