@@ -58,6 +58,9 @@ services:
     environment:
       # Query encode reuses the embedding worker's in-process BGE-M3 (no torch in API).
       EMBEDDING_SERVICE_URL: http://processor-embedding:8081
+    volumes:
+      # Keep public routes / HTTP embed client in sync without full image rebuilds.
+      - ./apps/api/newscrawl_api:/app/apps/api/newscrawl_api:ro
     networks:
       - internal
     depends_on:
@@ -142,7 +145,7 @@ services:
   processor-llm:
     image: newscrawl-processor:latest
     restart: unless-stopped
-    # batch-size 1: CPU Ollama cannot parallelize usefully; keeps latency predictable.
+    # Free-tier Gemini is ~5 RPM; keep concurrency at 1 to avoid immediate 429s.
     command: ["python", "-m", "newscrawl_processor.run_llm_worker", "--batch-size", "1"]
     env_file: env.prod
     networks:
@@ -165,6 +168,9 @@ services:
       EMBEDDING_SERVICE_URL: ""
     volumes:
       - hf_cache:/home/newscrawl/.cache/huggingface
+      # Encode HTTP server + worker code without full processor image rebuild.
+      - ./apps/processor/newscrawl_processor:/app/apps/processor/newscrawl_processor
+      - ./apps/api/newscrawl_api:/app/apps/api/newscrawl_api:ro
     networks:
       - internal
     depends_on:
@@ -186,6 +192,27 @@ services:
       resources:
         limits:
           memory: 4g
+
+  processor-retention:
+    image: newscrawl-processor:latest
+    restart: unless-stopped
+    # Purges articles older than ARTICLE_RETENTION_HOURS every ARTICLE_RETENTION_INTERVAL_HOURS.
+    command: ["python", "-m", "newscrawl_processor.run_retention_worker"]
+    env_file: env.prod
+    volumes:
+      - ./apps/processor/newscrawl_processor:/app/apps/processor/newscrawl_processor
+      - ./apps/api/newscrawl_api/config/settings.py:/app/apps/api/newscrawl_api/config/settings.py:ro
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   # ── State plane (never exposed to traefik_proxy) ────────────────────────────
   postgres:
