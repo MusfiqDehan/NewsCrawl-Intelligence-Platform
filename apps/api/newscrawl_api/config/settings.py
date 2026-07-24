@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "local-dev-secret-change-me"  # noqa: S105 - dev default
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 60
+    jwt_refresh_token_expire_days: int = 14
     cors_allowed_origins: str = "http://localhost:3000"
 
     admin_email: str = "admin@newscrawl.dev"
@@ -48,7 +49,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-5"
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "qwen3:8b"
+    # 1.5b is the practical CPU default under load; use 3b+ when RAM/GPU allow.
+    ollama_model: str = "qwen2.5:1.5b"
     llm_fallback_providers: str = ""
     llm_timeout_seconds: float = 60.0
     llm_max_retries: int = 3
@@ -58,6 +60,10 @@ class Settings(BaseSettings):
     embedding_dimension: int = 1024
     embedding_device: str = "cpu"
     embedding_version: int = 1
+    # When set (prod), API query encode goes to the embedding worker HTTP server
+    # instead of loading sentence-transformers in the API process.
+    embedding_service_url: str = ""
+    embedding_service_port: int = 8081
 
     # ── Crawler ──────────────────────────────────────────────────────────────
     crawler_user_agent: str = "NewsCrawlBot/0.1 (+https://newscrawl.musfiqdehan.com/bot)"
