@@ -2,7 +2,7 @@
 
 import { SearchIcon } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   Badge,
@@ -15,13 +15,21 @@ import {
   StatusBadge,
 } from "@/components/ui";
 import { useSemanticSearch } from "@/lib/hooks";
+import { detectQueryLanguage } from "@/lib/language";
 
 export default function SearchPage() {
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
   const [language, setLanguage] = useState("");
+  const [languageTouched, setLanguageTouched] = useState(false);
 
   const { data, isFetching, error } = useSemanticSearch(query, language || undefined);
+
+  useEffect(() => {
+    if (languageTouched) return;
+    const detected = detectQueryLanguage(input);
+    if (detected) setLanguage(detected);
+  }, [input, languageTouched]);
 
   return (
     <div className="space-y-6">
@@ -29,7 +37,7 @@ export default function SearchPage() {
         <h1 className="text-xl font-semibold text-white">Semantic Search</h1>
         <p className="mt-1 text-sm text-slate-500">
           Meaning-based search across Bangla and English articles, powered by BGE-M3
-          embeddings and pgvector.
+          embeddings and pgvector. Bangla queries are scoped to Bangla articles.
         </p>
       </div>
 
@@ -37,16 +45,26 @@ export default function SearchPage() {
         className="flex flex-wrap gap-3"
         onSubmit={(e) => {
           e.preventDefault();
+          if (!languageTouched) {
+            const detected = detectQueryLanguage(input);
+            if (detected) setLanguage(detected);
+          }
           setQuery(input);
         }}
       >
         <Input
-          placeholder="e.g. flood relief efforts in coastal districts…"
+          placeholder="e.g. প্রশ্নফাঁস or flood relief in coastal districts…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           className="w-96"
         />
-        <Select value={language} onChange={(e) => setLanguage(e.target.value)}>
+        <Select
+          value={language}
+          onChange={(e) => {
+            setLanguageTouched(true);
+            setLanguage(e.target.value);
+          }}
+        >
           <option value="">All languages</option>
           <option value="bn">Bangla</option>
           <option value="en">English</option>
