@@ -281,20 +281,31 @@ async def top_topics(
     ]
 
 
+_SENTIMENT_CANONICAL = ("positive", "negative", "neutral", "not available")
+
+
+def _normalize_sentiment_label(value: str | None) -> str:
+    if value is None:
+        return "not available"
+    key = value.strip().lower()
+    if key in ("positive", "negative", "neutral"):
+        return key
+    return "not available"
+
+
 @router.get("/sentiment", response_model=list[SentimentBucket])
 async def sentiment_distribution(
     db: DbDep,
     _user: CurrentUser,
 ) -> list[SentimentBucket]:
     rows = (
-        await db.execute(
-            select(Article.sentiment, func.count())
-            .where(Article.sentiment.is_not(None))
-            .group_by(Article.sentiment)
-            .order_by(func.count().desc())
-        )
+        await db.execute(select(Article.sentiment, func.count()).group_by(Article.sentiment))
     ).all()
-    return [SentimentBucket(sentiment=sentiment, count=count) for sentiment, count in rows]
+    totals: dict[str, int] = {label: 0 for label in _SENTIMENT_CANONICAL}
+    for sentiment, count in rows:
+        label = _normalize_sentiment_label(sentiment)
+        totals[label] = totals.get(label, 0) + int(count)
+    return [SentimentBucket(sentiment=label, count=totals[label]) for label in _SENTIMENT_CANONICAL]
 
 
 @router.get("/llm/daily", response_model=list[LlmDailyCost])
