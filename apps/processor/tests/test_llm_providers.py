@@ -10,20 +10,40 @@ from newscrawl_processor.llm.providers import (
 )
 
 
+def test_hybrid_chain_gemini_deepseek_ollama() -> None:
+    settings = Settings(
+        llm_provider="gemini",
+        llm_fallback_providers="deepseek,ollama",
+        gemini_api_key="test-key",
+        deepseek_api_key="ds-key",
+        ollama_base_url="http://ollama:11434",
+        ollama_model="qwen2.5:1.5b",
+    )
+    chain = build_provider_chain(settings)
+    assert [p.name for p in chain] == ["gemini", "deepseek", "ollama"]
+
+
 def test_provider_is_configured_requires_credentials() -> None:
     settings = Settings(
         gemini_api_key="",
         openai_api_key="",
         anthropic_api_key="",
+        deepseek_api_key="",
         ollama_base_url="",
     )
     assert not provider_is_configured("gemini", settings)
     assert not provider_is_configured("openai", settings)
     assert not provider_is_configured("anthropic", settings)
+    assert not provider_is_configured("deepseek", settings)
     assert not provider_is_configured("ollama", settings)
 
-    settings = Settings(gemini_api_key="k", ollama_base_url="http://ollama:11434")
+    settings = Settings(
+        gemini_api_key="k",
+        deepseek_api_key="ds",
+        ollama_base_url="http://ollama:11434",
+    )
     assert provider_is_configured("gemini", settings)
+    assert provider_is_configured("deepseek", settings)
     assert provider_is_configured("ollama", settings)
 
 
