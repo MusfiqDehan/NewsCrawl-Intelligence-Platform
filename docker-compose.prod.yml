@@ -55,6 +55,9 @@ services:
     container_name: newscrawl-api
     restart: unless-stopped
     env_file: env.prod
+    environment:
+      # Query encode reuses the embedding worker's in-process BGE-M3 (no torch in API).
+      EMBEDDING_SERVICE_URL: http://processor-embedding:8081
     networks:
       - internal
     depends_on:
@@ -63,6 +66,10 @@ services:
       redis:
         condition: service_healthy
       minio:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
+      processor-embedding:
         condition: service_started
 
   web:
@@ -85,6 +92,20 @@ services:
       dockerfile: infrastructure/docker/Dockerfile.crawler
     image: newscrawl-crawler:latest
     restart: unless-stopped
+    # Fair scheduling: rotate sources after a capped page budget so one fat
+    # frontier cannot starve every other outlet.
+    command:
+      [
+        "python",
+        "-m",
+        "newscrawl_crawler.run_worker",
+        "--max-pages",
+        "25",
+        "--batch-size",
+        "10",
+        "--interval",
+        "5",
+      ]
     env_file: env.prod
     networks:
       - internal
@@ -95,6 +116,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+      minio-init:
+        condition: service_completed_successfully
     deploy:
       resources:
         limits:
@@ -119,19 +142,27 @@ services:
   processor-llm:
     image: newscrawl-processor:latest
     restart: unless-stopped
-    command: ["python", "-m", "newscrawl_processor.run_llm_worker"]
+    # batch-size 1: CPU Ollama cannot parallelize usefully; keeps latency predictable.
+    command: ["python", "-m", "newscrawl_processor.run_llm_worker", "--batch-size", "1"]
     env_file: env.prod
     networks:
       - internal
     depends_on:
       processor-cleaning:
         condition: service_started
+      ollama:
+        condition: service_started
+      ollama-pull:
+        condition: service_completed_successfully
 
   processor-embedding:
     image: newscrawl-processor:latest
     restart: unless-stopped
     command: ["python", "-m", "newscrawl_processor.run_embedding_worker"]
     env_file: env.prod
+    environment:
+      # Worker must load the model locally (encode server lives here).
+      EMBEDDING_SERVICE_URL: ""
     volumes:
       - hf_cache:/home/newscrawl/.cache/huggingface
     networks:
@@ -139,6 +170,18 @@ services:
     depends_on:
       processor-cleaning:
         condition: service_started
+      hf-cache-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/healthz', timeout=5)\"",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
     deploy:
       resources:
         limits:
@@ -195,6 +238,89 @@ services:
     networks:
       - internal
 
+  # One-shot bucket bootstrap (required before crawlers can store raw HTML).
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      i=0;
+      until mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}; do
+        i=$$((i+1));
+        if [ $$i -ge 30 ]; then echo 'minio not ready' >&2; exit 1; fi;
+        sleep 2;
+      done;
+      mc mb --ignore-existing local/$${BUCKET};
+      exit 0
+      "
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+      BUCKET: ${S3_BUCKET_RAW_HTML:-newscrawl-raw-html}
+    networks:
+      - internal
+    restart: "no"
+
+  # Ensure the HuggingFace cache volume is writable by the processor user (uid 999).
+  hf-cache-init:
+    image: busybox:1.37
+    user: "0"
+    volumes:
+      - hf_cache:/cache
+    command: ["sh", "-c", "mkdir -p /cache && chown -R 999:999 /cache"]
+    restart: "no"
+
+  # Local open-weight LLM (Ollama). Used as Gemini fallback on 429/expiry, or
+  # as the sole provider when LLM_PROVIDER=ollama (no cloud API keys needed).
+  ollama:
+    image: ollama/ollama:latest
+    container_name: newscrawl-ollama
+    restart: unless-stopped
+    environment:
+      # One model at a time; keep loaded between requests on CPU hosts.
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_KEEP_ALIVE: "30m"
+      OLLAMA_NUM_PARALLEL: "1"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - internal
+    # Contabo VPS is CPU-only; keep headroom for postgres + embeddings.
+    deploy:
+      resources:
+        limits:
+          memory: 5g
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  # Pull the configured model once Ollama is up (idempotent).
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      i=0;
+      until ollama list >/dev/null 2>&1; do
+        i=$$((i+1));
+        if [ $$i -ge 60 ]; then echo 'ollama not ready' >&2; exit 1; fi;
+        sleep 2;
+      done;
+      ollama pull $${OLLAMA_MODEL:-qwen2.5:1.5b}
+      "
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:1.5b}
+    networks:
+      - internal
+    restart: "no"
+
   # Nightly pg_dump into the postgres_backups volume (see docs/runbook.md).
   postgres-backup:
     image: pgvector/pgvector:pg17
@@ -228,3 +354,4 @@ volumes:
   redis_data:
   minio_data:
   hf_cache:
+  ollama_data:
