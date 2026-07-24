@@ -1,15 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { Sidebar } from "@/components/sidebar";
-import { getToken } from "@/lib/api";
-
-function subscribeToStorage(callback: () => void) {
-  window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
-}
+import { bootstrapSessionRefresh, getToken, subscribeToAuth } from "@/lib/api";
 
 export default function DashboardLayout({
   children,
@@ -17,12 +12,29 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  // Server snapshot is null so the guard renders nothing during SSR/prerender.
-  const token = useSyncExternalStore(subscribeToStorage, getToken, () => null);
+  // Wait until the client has mounted before trusting localStorage / redirecting.
+  // Prerender + hydration start with a null server snapshot; redirecting on that
+  // null value was logging users out on every dashboard reload.
+  const [ready, setReady] = useState(false);
+  const token = useSyncExternalStore(subscribeToAuth, getToken, () => null);
 
   useEffect(() => {
+    setReady(true);
+    bootstrapSessionRefresh();
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
     if (token === null) router.replace("/login");
-  }, [token, router]);
+  }, [ready, token, router]);
+
+  if (!ready) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-950 text-sm text-slate-500">
+        Restoring session…
+      </div>
+    );
+  }
 
   if (!token) return null;
 
