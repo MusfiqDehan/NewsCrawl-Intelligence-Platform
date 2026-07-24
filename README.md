@@ -2,10 +2,12 @@
 
 **Live demo:** [https://newscrawl.musfiqdehan.com/](https://newscrawl.musfiqdehan.com/)
 
-| | |
-| --- | --- |
-| **Email** | `admin@musfiqdehan.com` |
+
+|              |                             |
+| ------------ | --------------------------- |
+| **Email**    | `admin@musfiqdehan.com`     |
 | **Password** | `Nc!ETnoZJRy8GTfX56wuMxg9A` |
+
 
 Public semantic search (no login): [https://newscrawl.musfiqdehan.com/explore](https://newscrawl.musfiqdehan.com/explore)
 
@@ -35,6 +37,8 @@ Next.js dashboard ──► FastAPI (control + query plane)
 Five separated planes: **control** (API), **crawl** (Scrapy + Playwright workers), **processing** (Redis Streams consumers), **query** (API + pgvector search), **observability** (Prometheus + Grafana + structured JSON logs).
 
 Design decisions are documented in [docs/architecture.md](docs/architecture.md) and the other documents under [docs/](docs/).
+
+![Operations dashboard overview](docs/images/dashboard-overview.png)
 
 ## Repository layout
 
@@ -79,15 +83,19 @@ make test               # unit tests
 make test-integration   # testcontainers-based integration tests
 ```
 
+
+
 ## Environments
 
-| | Local | Production |
-|---|---|---|
-| Compose file | `docker-compose.local.yml` | `docker-compose.prod.yml` |
-| Env file | `env.local` | `env.prod` |
-| Edge | direct ports | central Traefik → internal Nginx |
-| Domains | `localhost:3000` / `:8000` | `newscrawl.musfiqdehan.com` / `newscrawl-api.musfiqdehan.com` |
-| Monitoring | bundled Prometheus + Grafana | central monitoring stack (Prometheus, Grafana, Loki) |
+
+|              | Local                        | Production                                                    |
+| ------------ | ---------------------------- | ------------------------------------------------------------- |
+| Compose file | `docker-compose.local.yml`   | `docker-compose.prod.yml`                                     |
+| Env file     | `env.local`                  | `env.prod`                                                    |
+| Edge         | direct ports                 | central Traefik → internal Nginx                              |
+| Domains      | `localhost:3000` / `:8000`   | `newscrawl.musfiqdehan.com` / `newscrawl-api.musfiqdehan.com` |
+| Monitoring   | bundled Prometheus + Grafana | central monitoring stack (Prometheus, Grafana, Loki)          |
+
 
 Production deployment details: [docs/deployment.md](docs/deployment.md).
 
@@ -100,6 +108,8 @@ Production deployment details: [docs/deployment.md](docs/deployment.md).
 - [docs/deployment.md](docs/deployment.md) — production deployment (Traefik + Nginx)
 - [docs/runbook.md](docs/runbook.md) — day-2 operations, backup/restore, scaling
 - [docs/benchmarks.md](docs/benchmarks.md) — performance notes and bottlenecks
+
+
 
 ## Legal & operational posture
 
