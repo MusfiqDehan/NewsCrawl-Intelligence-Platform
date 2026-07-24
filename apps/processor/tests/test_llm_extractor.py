@@ -92,7 +92,7 @@ class TestExtractor:
         assert analysis.summary == VALID_ANALYSIS["summary"]
         assert usage.attempts == 2  # type: ignore[attr-defined]
         # Second call got the corrective instruction appended
-        assert "ONLY the JSON object" in provider.calls[1]
+        assert "ONLY one JSON object" in provider.calls[1]
         # Both attempts' tokens are accounted
         assert usage.total_tokens == 300  # type: ignore[attr-defined]
 
@@ -102,11 +102,12 @@ class TestExtractor:
         analysis, _ = await analyze(extractor(provider))
         assert analysis.sentiment == "neutral"
 
-    async def test_hallucinated_fields_rejected(self) -> None:
+    async def test_hallucinated_fields_stripped(self) -> None:
         bad = dict(VALID_ANALYSIS, invented_field="x")
-        provider = FakeProvider([json.dumps(bad), json.dumps(VALID_ANALYSIS)])
-        _analysis, usage = await analyze(extractor(provider))
-        assert usage.attempts == 2  # type: ignore[attr-defined]
+        provider = FakeProvider([json.dumps(bad)])
+        analysis, usage = await analyze(extractor(provider))
+        assert analysis.sentiment == "neutral"
+        assert usage.attempts == 1  # type: ignore[attr-defined]
 
     async def test_provider_error_falls_back_to_next_provider(self) -> None:
         primary = FakeProvider([LLMProviderError("boom"), LLMProviderError("boom")])
@@ -115,6 +116,17 @@ class TestExtractor:
         assert analysis.sentiment == "neutral"
         assert usage.provider == "fake"  # type: ignore[attr-defined]
         assert usage.attempts == 3  # type: ignore[attr-defined]
+
+    async def test_non_retryable_error_skips_to_next_provider(self) -> None:
+        """429 / quota errors must not burn retries before falling back to Ollama."""
+        primary = FakeProvider(
+            [LLMProviderError("gemini: 429 RESOURCE_EXHAUSTED", retryable=False)]
+        )
+        secondary = FakeProvider([json.dumps(VALID_ANALYSIS)])
+        analysis, usage = await analyze(extractor(primary, secondary))
+        assert analysis.sentiment == "neutral"
+        assert usage.attempts == 2  # type: ignore[attr-defined]
+        assert len(primary.calls) == 1
 
     async def test_all_providers_exhausted_raises_with_usage(self) -> None:
         primary = FakeProvider([LLMProviderError("a"), LLMProviderError("b")])
@@ -149,6 +161,6 @@ class TestCostTracking:
             prompt_tokens=1000,
             completion_tokens=1000,
             provider="ollama",
-            model="qwen3:8b",
+            model="qwen2.5:1.5b",
         )
         assert completion_cost_usd(completion) == 0.0
