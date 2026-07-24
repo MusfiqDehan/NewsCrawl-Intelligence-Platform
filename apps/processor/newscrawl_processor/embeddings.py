@@ -9,6 +9,7 @@ body-embedding cosine similarity once vectors exist. Confirmed rewrites are
 persisted but marked via articles.duplicate_of.
 """
 
+import asyncio
 import uuid
 from dataclasses import dataclass
 
@@ -60,7 +61,7 @@ class EmbeddingService:
             EmbeddingKind.BODY: f"{article.title}\n{article.body[:MAX_EMBED_CHARS]}",
         }
         wanted = [k for k in kinds if texts.get(k)]
-        vectors = self.backend.encode([texts[k] for k in wanted])
+        vectors = await asyncio.to_thread(self.backend.encode, [texts[k] for k in wanted])
 
         for kind, vector in zip(wanted, vectors, strict=True):
             # Idempotent upsert of the (article, kind, model, version) slot
