@@ -2,11 +2,18 @@
 
 :root {
   color-scheme: dark;
+  --nc-ink: #020617;
+  --nc-panel: #0b1220;
+  --nc-line: #1e293b;
+  --nc-mist: #94a3b8;
+  --nc-signal: #0ea5e9;
+  --nc-signal-soft: rgba(14, 165, 233, 0.16);
 }
 
 body {
-  background-color: #020617;
+  background-color: var(--nc-ink);
   color: #e2e8f0;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: "tnum";
 }
 
@@ -22,4 +29,66 @@ body {
 
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+@keyframes nc-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes nc-drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-2.5%, -1.5%, 0);
+  }
+}
+
+@keyframes nc-pulse-line {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.nc-fade-up {
+  animation: nc-fade-up 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.nc-fade-up-delay-1 {
+  animation-delay: 0.12s;
+}
+
+.nc-fade-up-delay-2 {
+  animation-delay: 0.24s;
+}
+
+.nc-fade-up-delay-3 {
+  animation-delay: 0.36s;
+}
+
+.nc-grid-drift {
+  animation: nc-drift 28s linear infinite alternate;
+}
+
+.nc-pulse-line {
+  animation: nc-pulse-line 3.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nc-fade-up,
+  .nc-grid-drift,
+  .nc-pulse-line {
+    animation: none !important;
+  }
 }
