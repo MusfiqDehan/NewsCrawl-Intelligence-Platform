@@ -53,7 +53,7 @@ export default function LandingPage() {
   const primaryLabel = token ? "Open dashboard" : "Sign in";
 
   return (
-    <div className="min-h-screen bg-[var(--nc-ink)] text-slate-200">
+    <div className="nc-landing min-h-screen bg-[var(--nc-ink)] text-slate-200">
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="relative isolate min-h-[100svh] overflow-hidden">
         <div

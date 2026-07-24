@@ -12,6 +12,7 @@ import type {
   QueueDepths,
   ScoredArticle,
   SemanticSearchResult,
+  SentimentBucket,
   Source,
   SourceHealth,
   Worker,
@@ -22,6 +23,14 @@ export function useOverview() {
     queryKey: ["overview"],
     queryFn: () => api<Overview>("/stats/overview"),
     refetchInterval: 15_000,
+  });
+}
+
+export function useSentiment() {
+  return useQuery({
+    queryKey: ["sentiment"],
+    queryFn: () => api<SentimentBucket[]>("/stats/sentiment"),
+    refetchInterval: 30_000,
   });
 }
 

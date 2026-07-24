@@ -43,7 +43,7 @@ DUPLICATES = Counter(
     ["method"],
 )
 
-_DEFAULT_PORTS = {"cleaning": 9102, "llm": 9103, "embedding": 9104}
+_DEFAULT_PORTS = {"cleaning": 9102, "llm": 9103, "embedding": 9104, "retention": 9105}
 
 
 def start_metrics_server(worker: str) -> int:

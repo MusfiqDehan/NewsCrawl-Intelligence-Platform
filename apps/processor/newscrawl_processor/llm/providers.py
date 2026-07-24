@@ -19,8 +19,8 @@ from newscrawl_api.observability import get_logger
 
 log = get_logger()
 
-# Local inference is slower than cloud APIs; never starve Ollama with a short timeout.
-_OLLAMA_MIN_TIMEOUT_SECONDS = 600.0
+# Local inference is slower than cloud APIs; keep a generous but bounded timeout.
+_OLLAMA_MIN_TIMEOUT_SECONDS = 120.0
 
 # Keep local context modest so CPU hosts finish within the timeout.
 _OLLAMA_NUM_CTX = 1024
@@ -52,8 +52,12 @@ class LLMCompletion:
 PRICING_PER_MTOK: dict[str, tuple[float, float]] = {
     "gemini-2.5-flash": (0.30, 2.50),
     "gemini-2.5-pro": (1.25, 10.00),
+    "gemini-2.0-flash": (0.10, 0.40),
     "gpt-5.2-mini": (0.25, 2.00),
     "claude-sonnet-4-5": (3.00, 15.00),
+    # DeepSeek chat pricing (approx.; update if vendor rates change).
+    "deepseek-chat": (0.28, 0.42),
+    "deepseek-reasoner": (0.55, 2.19),
 }
 
 
@@ -207,6 +211,12 @@ class OpenAIProvider(_HttpProvider):
         )
 
 
+class DeepSeekProvider(OpenAIProvider):
+    """DeepSeek Chat Completions API (OpenAI-compatible)."""
+
+    name = "deepseek"
+
+
 class AnthropicProvider(_HttpProvider):
     name = "anthropic"
 
@@ -287,6 +297,8 @@ def provider_is_configured(name: str, settings: Settings) -> bool:
         return bool(settings.openai_api_key.strip())
     if name == "anthropic":
         return bool(settings.anthropic_api_key.strip())
+    if name == "deepseek":
+        return bool(settings.deepseek_api_key.strip())
     if name == "ollama":
         return bool(settings.ollama_base_url.strip())
     return False
@@ -300,6 +312,13 @@ def build_provider(name: str, settings: Settings) -> LLMProvider:
         return OpenAIProvider(settings.openai_api_key, settings.openai_model, timeout)
     if name == "anthropic":
         return AnthropicProvider(settings.anthropic_api_key, settings.anthropic_model, timeout)
+    if name == "deepseek":
+        return DeepSeekProvider(
+            settings.deepseek_api_key,
+            settings.deepseek_model,
+            timeout,
+            base_url=settings.deepseek_base_url or "https://api.deepseek.com",
+        )
     if name == "ollama":
         ollama_timeout = max(timeout, _OLLAMA_MIN_TIMEOUT_SECONDS)
         return OllamaProvider(settings.ollama_base_url, settings.ollama_model, ollama_timeout)

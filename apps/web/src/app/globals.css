@@ -8,6 +8,9 @@
   --nc-mist: #94a3b8;
   --nc-signal: #0ea5e9;
   --nc-signal-soft: rgba(14, 165, 233, 0.16);
+  /* App UI (dashboard, explore, login): Hind Siliguri for Bangla + Latin. */
+  --font-sans: var(--font-hind);
+  --font-display: var(--font-hind);
 }
 
 body {
@@ -15,6 +18,13 @@ body {
   color: #e2e8f0;
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: "tnum";
+}
+
+/* Homepage keeps the original Manrope + Syne pairing. */
+.nc-landing {
+  --font-sans: var(--font-sans-manrope);
+  --font-display: var(--font-display-syne);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
 ::-webkit-scrollbar {

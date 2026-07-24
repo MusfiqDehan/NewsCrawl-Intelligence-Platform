@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from newscrawl_api.models import Article
+from newscrawl_api.observability import get_logger
 from newscrawl_api.schemas.article import (
     ArticleDetail,
     ArticleListResponse,
@@ -21,6 +22,8 @@ from newscrawl_api.schemas.article import (
 )
 from newscrawl_api.services.embedding_backend import get_embedding_backend
 from newscrawl_api.services.search import SemanticSearchService, detect_query_language
+
+log = get_logger()
 
 # Below this cosine similarity, prefer lexical ranking over noisy neighbours.
 _MIN_SEMANTIC = 0.50
@@ -116,18 +119,23 @@ async def semantic_search(
     # index is still English-heavy (embedding backlog).
     effective_language = language or detect_query_language(q)
 
-    backend = get_embedding_backend()
-    vectors = await asyncio.to_thread(backend.encode, [q])
-
     service = SemanticSearchService(embedding_model, embedding_version)
-    semantic = await service.search(
-        db,
-        vectors[0],
-        kind=EmbeddingKind.BODY,
-        limit=limit,
-        language=effective_language,
-        source_id=source_id,
-    )
+    semantic: list = []
+    try:
+        backend = get_embedding_backend()
+        vectors = await asyncio.to_thread(backend.encode, [q])
+        semantic = await service.search(
+            db,
+            vectors[0],
+            kind=EmbeddingKind.BODY,
+            limit=limit,
+            language=effective_language,
+            source_id=source_id,
+        )
+    except Exception as exc:
+        # Encode server may still be loading BGE-M3; lexical still returns hits.
+        log.warning("semantic_encode_unavailable", error=str(exc), query=q[:80])
+
     lexical = await service.lexical_search(
         db,
         q,

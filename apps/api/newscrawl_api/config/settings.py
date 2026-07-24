@@ -48,10 +48,14 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-5.2-mini"
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-5"
+    # DeepSeek (OpenAI-compatible): https://api.deepseek.com
+    deepseek_api_key: str = ""
+    deepseek_model: str = "deepseek-chat"
+    deepseek_base_url: str = "https://api.deepseek.com"
     ollama_base_url: str = "http://localhost:11434"
     # 1.5b is the practical CPU default under load; use 3b+ when RAM/GPU allow.
     ollama_model: str = "qwen2.5:1.5b"
-    llm_fallback_providers: str = ""
+    llm_fallback_providers: str = "deepseek,ollama"
     llm_timeout_seconds: float = 60.0
     llm_max_retries: int = 3
 
@@ -74,6 +78,11 @@ class Settings(BaseSettings):
     # ── Observability ────────────────────────────────────────────────────────
     log_level: str = "INFO"
     metrics_port: int = 9100
+
+    # ── Article retention ────────────────────────────────────────────────────
+    # Delete articles older than this age; scheduler wakes this often.
+    article_retention_hours: int = 24
+    article_retention_interval_hours: int = 12
 
     @property
     def cors_origins(self) -> list[str]:

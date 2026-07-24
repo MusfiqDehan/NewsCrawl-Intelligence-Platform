@@ -26,6 +26,8 @@ from newscrawl_processor.llm.schema import ArticleAnalysis, analysis_json_schema
 log = get_logger()
 
 MAX_BODY_CHARS = 1_200
+# Tiny local models choke on long prompt+body; keep Ollama prompts short.
+MAX_BODY_CHARS_LOCAL = 600
 
 SYSTEM_PROMPT = (
     "You are a news analysis engine. You receive one news article (Bangla or "
@@ -124,8 +126,8 @@ def recover_json(text: str) -> dict[str, object]:
     return {key: value for key, value in parsed.items() if key in allowed}
 
 
-def build_user_prompt(title: str, body: str, language: str) -> str:
-    truncated = body[:MAX_BODY_CHARS]
+def build_user_prompt(title: str, body: str, language: str, *, max_body_chars: int = MAX_BODY_CHARS) -> str:
+    truncated = body[:max_body_chars]
     return f"Language: {language}\nTitle: {title}\n\nArticle:\n{truncated}"
 
 
@@ -147,12 +149,17 @@ class LlmExtractor:
         self, *, title: str, body: str, language: str
     ) -> tuple[ArticleAnalysis, LlmUsage]:
         usage = LlmUsage()
-        user_prompt = build_user_prompt(title, body, language)
 
         for provider in self.providers:
+            max_chars = MAX_BODY_CHARS_LOCAL if provider.name == "ollama" else MAX_BODY_CHARS
+            user_prompt = build_user_prompt(title, body, language, max_body_chars=max_chars)
             prompt = user_prompt
             system = LOCAL_SYSTEM_PROMPT if provider.name == "ollama" else SYSTEM_PROMPT
-            for attempt in range(1, self.max_retries + 1):
+            # When Ollama is only a fallback, don't burn minutes of CPU retries.
+            provider_retries = (
+                1 if provider.name == "ollama" and len(self.providers) > 1 else self.max_retries
+            )
+            for attempt in range(1, provider_retries + 1):
                 usage.attempts += 1
                 try:
                     completion = await provider.complete(system, prompt)
@@ -166,15 +173,26 @@ class LlmExtractor:
                         error=str(exc),
                     )
                     # Quota/auth failures (e.g. Gemini 429) → next provider immediately.
-                    if not exc.retryable:
+                    if not getattr(exc, "retryable", True):
                         break
-                    if attempt < self.max_retries:
+                    if attempt < provider_retries:
                         await asyncio.sleep(self.backoff_base_seconds * 2 ** (attempt - 1))
                     continue
 
                 usage.add(completion)
+                raw_text = (completion.text or "").strip()
+                if not raw_text or raw_text in {"{}", "null", "[]"}:
+                    usage.errors.append("malformed: empty JSON reply")
+                    log.warning(
+                        "llm_malformed_response",
+                        provider=provider.name,
+                        attempt=attempt,
+                        error="empty JSON reply",
+                    )
+                    prompt = user_prompt + _CORRECTIVE_NOTE
+                    continue
                 try:
-                    analysis = ArticleAnalysis.model_validate(recover_json(completion.text))
+                    analysis = ArticleAnalysis.model_validate(recover_json(raw_text))
                 except (MalformedResponseError, ValidationError) as exc:
                     usage.errors.append(f"malformed: {exc}")
                     log.warning(

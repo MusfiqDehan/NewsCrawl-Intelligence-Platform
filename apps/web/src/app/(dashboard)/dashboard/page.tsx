@@ -4,6 +4,10 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -11,8 +15,22 @@ import {
 } from "recharts";
 
 import { Card, CardTitle, Spinner, StatusBadge } from "@/components/ui";
-import { useOverview, useQueues } from "@/lib/hooks";
+import { useOverview, useQueues, useSentiment } from "@/lib/hooks";
 import { formatNumber } from "@/lib/utils";
+
+const SENTIMENT_COLORS: Record<string, string> = {
+  positive: "#34d399",
+  negative: "#f87171",
+  neutral: "#94a3b8",
+  "not available": "#38bdf8",
+};
+
+const SENTIMENT_LABELS: Record<string, string> = {
+  positive: "Positive",
+  negative: "Negative",
+  neutral: "Neutral",
+  "not available": "Not available",
+};
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -26,12 +44,22 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 
 export default function OverviewPage() {
   const { data: overview, isLoading } = useOverview();
+  const { data: sentiment } = useSentiment();
   const { data: queues } = useQueues();
 
   if (isLoading || !overview) return <Spinner />;
 
   const languages = Object.entries(overview.articles_by_language);
   const frontier = Object.entries(overview.frontier).sort((a, b) => b[1] - a[1]);
+  const sentimentData =
+    sentiment
+      ?.filter((b) => b.count > 0)
+      .map((b) => ({
+        name: SENTIMENT_LABELS[b.sentiment] ?? b.sentiment,
+        key: b.sentiment,
+        value: b.count,
+      })) ?? [];
+  const sentimentTotal = sentiment?.reduce((sum, b) => sum + b.count, 0) ?? 0;
 
   return (
     <div className="space-y-6">
@@ -90,37 +118,87 @@ export default function OverviewPage() {
           </div>
         </Card>
 
-        <div className="space-y-4">
-          <Card>
-            <CardTitle>Articles by language</CardTitle>
-            <div className="space-y-2">
-              {languages.length === 0 && (
-                <div className="text-sm text-slate-500">No articles yet</div>
-              )}
-              {languages.map(([lang, count]) => (
-                <div key={lang} className="flex items-center justify-between">
-                  <StatusBadge status={lang} />
-                  <span className="text-sm text-slate-300">{formatNumber(count)}</span>
-                </div>
-              ))}
+        <Card>
+          <CardTitle>Sentiment</CardTitle>
+          {sentimentTotal === 0 || sentimentData.length === 0 ? (
+            <div className="flex h-64 items-center justify-center text-sm text-slate-500">
+              No articles yet
             </div>
-          </Card>
+          ) : (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={sentimentData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="46%"
+                    innerRadius={48}
+                    outerRadius={78}
+                    paddingAngle={2}
+                  >
+                    {sentimentData.map((entry) => (
+                      <Cell
+                        key={entry.key}
+                        fill={SENTIMENT_COLORS[entry.key] ?? "#64748b"}
+                        stroke="#0f172a"
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value) => formatNumber(Number(value))}
+                    contentStyle={{
+                      backgroundColor: "#0f172a",
+                      border: "1px solid #334155",
+                      borderRadius: 8,
+                    }}
+                    labelStyle={{ color: "#e2e8f0" }}
+                  />
+                  <Legend
+                    verticalAlign="bottom"
+                    height={36}
+                    formatter={(value) => (
+                      <span className="text-xs text-slate-400">{value}</span>
+                    )}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Card>
+      </div>
 
-          <Card>
-            <CardTitle>URL frontier</CardTitle>
-            <div className="space-y-2">
-              {frontier.length === 0 && (
-                <div className="text-sm text-slate-500">Frontier is empty</div>
-              )}
-              {frontier.map(([status, count]) => (
-                <div key={status} className="flex items-center justify-between">
-                  <StatusBadge status={status} />
-                  <span className="text-sm text-slate-300">{formatNumber(count)}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardTitle>Articles by language</CardTitle>
+          <div className="space-y-2">
+            {languages.length === 0 && (
+              <div className="text-sm text-slate-500">No articles yet</div>
+            )}
+            {languages.map(([lang, count]) => (
+              <div key={lang} className="flex items-center justify-between">
+                <StatusBadge status={lang} />
+                <span className="text-sm text-slate-300">{formatNumber(count)}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card>
+          <CardTitle>URL frontier</CardTitle>
+          <div className="space-y-2">
+            {frontier.length === 0 && (
+              <div className="text-sm text-slate-500">Frontier is empty</div>
+            )}
+            {frontier.map(([status, count]) => (
+              <div key={status} className="flex items-center justify-between">
+                <StatusBadge status={status} />
+                <span className="text-sm text-slate-300">{formatNumber(count)}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
     </div>
   );
