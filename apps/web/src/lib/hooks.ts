@@ -104,6 +104,55 @@ export function useSemanticSearch(q: string, language?: string) {
   });
 }
 
+/** Unauthenticated explore surface — never attaches a bearer token. */
+export function usePublicSemanticSearch(q: string, language?: string) {
+  return useQuery({
+    queryKey: ["public-semantic-search", q, language],
+    queryFn: () =>
+      api<SemanticSearchResult>("/public/search/semantic", {
+        params: { q, language },
+        skipAuth: true,
+      }),
+    enabled: q.trim().length >= 2,
+    staleTime: 60_000,
+  });
+}
+
+export function usePublicArticles(params: {
+  language?: string;
+  q?: string;
+  page: number;
+}) {
+  return useQuery({
+    queryKey: ["public-articles", params],
+    queryFn: () =>
+      api<ArticleList>("/public/articles", {
+        params: { ...params, page_size: 20 },
+        skipAuth: true,
+      }),
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function usePublicArticle(id: string) {
+  return useQuery({
+    queryKey: ["public-article", id],
+    queryFn: () =>
+      api<ArticleDetail>(`/public/articles/${id}`, { skipAuth: true }),
+    enabled: Boolean(id),
+  });
+}
+
+export function usePublicSimilarArticles(id: string) {
+  return useQuery({
+    queryKey: ["public-similar", id],
+    queryFn: () =>
+      api<ScoredArticle[]>(`/public/articles/${id}/similar`, { skipAuth: true }),
+    enabled: Boolean(id),
+    retry: false,
+  });
+}
+
 export function useWorkers() {
   return useQuery({
     queryKey: ["workers"],

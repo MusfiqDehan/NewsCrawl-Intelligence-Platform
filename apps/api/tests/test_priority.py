@@ -6,14 +6,16 @@ from newscrawl_contracts.enums import UrlType
 NOW = datetime(2026, 7, 23, 12, 0, tzinfo=UTC)
 
 
-def test_homepage_beats_article_beats_section() -> None:
+def test_discovery_hubs_beat_articles() -> None:
     def score(url_type: UrlType) -> float:
         return compute_priority(source_weight=1.0, url_type=url_type, now=NOW)
 
     assert (
         score(UrlType.HOMEPAGE)
-        > score(UrlType.ARTICLE)
+        > score(UrlType.RSS)
+        > score(UrlType.SITEMAP)
         > score(UrlType.SECTION)
+        > score(UrlType.ARTICLE)
         > score(UrlType.OTHER)
     )
 

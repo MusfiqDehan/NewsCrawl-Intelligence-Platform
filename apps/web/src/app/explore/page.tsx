@@ -14,16 +14,19 @@ import {
   Spinner,
   StatusBadge,
 } from "@/components/ui";
-import { useSemanticSearch } from "@/lib/hooks";
+import { usePublicSemanticSearch } from "@/lib/hooks";
 import { detectQueryLanguage } from "@/lib/language";
 
-export default function SearchPage() {
+export default function PublicSearchPage() {
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
   const [language, setLanguage] = useState("");
   const [languageTouched, setLanguageTouched] = useState(false);
 
-  const { data, isFetching, error } = useSemanticSearch(query, language || undefined);
+  const { data, isFetching, error } = usePublicSemanticSearch(
+    query,
+    language || undefined,
+  );
 
   useEffect(() => {
     if (languageTouched) return;
@@ -34,10 +37,12 @@ export default function SearchPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-white">Semantic Search</h1>
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold text-white">
+          Semantic Search
+        </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Meaning-based search across Bangla and English articles, powered by BGE-M3
-          embeddings and pgvector. Bangla queries are scoped to Bangla articles.
+          Search Bangla and English news by meaning — no account required. Bangla
+          queries stay scoped to Bangla articles.
         </p>
       </div>
 
@@ -49,14 +54,14 @@ export default function SearchPage() {
             const detected = detectQueryLanguage(input);
             if (detected) setLanguage(detected);
           }
-          setQuery(input);
+          setQuery(input.trim());
         }}
       >
         <Input
-          placeholder="e.g. প্রশ্নফাঁস or flood relief in coastal districts…"
+          placeholder="e.g. প্রশ্নফাঁস or flood relief…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          className="w-96"
+          className="min-w-[16rem] flex-1"
         />
         <Select
           value={language}
@@ -78,7 +83,7 @@ export default function SearchPage() {
       {isFetching && <Spinner />}
 
       {data && !isFetching && data.results.length === 0 && (
-        <EmptyState message="No matching articles — embeddings may still be processing" />
+        <EmptyState message="No matching articles found" />
       )}
 
       {data && !isFetching && data.results.length > 0 && (
@@ -86,7 +91,7 @@ export default function SearchPage() {
           {data.results.map(({ article, similarity }) => (
             <Link
               key={article.id}
-              href={`/articles/${article.id}`}
+              href={`/explore/articles/${article.id}`}
               className="block rounded-xl border border-slate-800 bg-slate-900/60 p-4 transition-colors hover:border-slate-700 hover:bg-slate-900"
             >
               <div className="flex items-start justify-between gap-4">

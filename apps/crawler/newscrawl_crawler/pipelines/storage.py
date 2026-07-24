@@ -34,6 +34,12 @@ class RawHtmlStoragePipeline:
             region_name=settings.s3_region,
             config=BotoConfig(connect_timeout=10, read_timeout=30, retries={"max_attempts": 3}),
         )
+        # Defense in depth: ensure the raw-HTML bucket exists even if minio-init
+        # was skipped (common cause of "crawlers run but no articles").
+        try:
+            self._client.head_bucket(Bucket=self.bucket)
+        except Exception:  # noqa: BLE001 - botocore raises ClientError variants
+            self._client.create_bucket(Bucket=self.bucket)
 
     async def process_item(self, item: PageItem, spider: Spider) -> PageItem:
         if item.url_type != UrlType.ARTICLE or not item.raw_html or item.not_modified:

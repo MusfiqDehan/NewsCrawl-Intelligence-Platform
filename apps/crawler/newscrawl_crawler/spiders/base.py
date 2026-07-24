@@ -59,6 +59,7 @@ class NewsSpiderBase(scrapy.Spider):
         source_config: str | dict[str, Any],
         crawl_job_id: str | None = None,
         batch_size: int = 20,
+        max_pages: int = 0,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
@@ -67,6 +68,10 @@ class NewsSpiderBase(scrapy.Spider):
         self.source = SourceConfig.model_validate(source_config)
         self.crawl_job_id = crawl_job_id
         self.batch_size = batch_size
+        # Hard per-pass budget (in addition to Scrapy's CLOSESPIDER_PAGECOUNT).
+        # Stops idle-refill from claiming more work after the budget is spent.
+        self.max_pages = max(0, int(max_pages or 0))
+        self._pages_claimed = 0
         self.worker_id = f"spider-{self.source.slug}-{id(self)}"
         self.frontier = Frontier()
         self.selectors = get_selector_set(self.source.slug)
@@ -89,11 +94,28 @@ class NewsSpiderBase(scrapy.Spider):
             yield request
 
     async def _claim_requests(self) -> list[scrapy.Request]:
+        if self.max_pages and self._pages_claimed >= self.max_pages:
+            self._exhausted = True
+            self.logger.info(
+                "page_budget_exhausted source=%s claimed=%d budget=%d",
+                self.source.slug,
+                self._pages_claimed,
+                self.max_pages,
+            )
+            return []
+
+        limit = self.batch_size
+        if self.max_pages:
+            limit = min(limit, max(self.max_pages - self._pages_claimed, 0))
+            if limit <= 0:
+                self._exhausted = True
+                return []
+
         async with session_scope() as db:
             claimed = await self.frontier.claim_batch(
                 db,
                 worker_id=self.worker_id,
-                limit=self.batch_size,
+                limit=limit,
                 source_id=self.source.id,
                 crawl_job_id=(uuid.UUID(self.crawl_job_id) if self.crawl_job_id else None),
             )
@@ -105,6 +127,7 @@ class NewsSpiderBase(scrapy.Spider):
             self._exhausted = True
             return []
 
+        self._pages_claimed += len(rows)
         requests = []
         for url_id, url_str, url_type, etag, last_modified in rows:
             use_browser = self._needs_browser(url_type)
@@ -133,7 +156,13 @@ class NewsSpiderBase(scrapy.Spider):
                     dont_filter=True,  # the frontier is the deduplicator
                 )
             )
-        self.logger.info("claimed_batch source=%s size=%d", self.source.slug, len(requests))
+        self.logger.info(
+            "claimed_batch source=%s size=%d total_claimed=%d budget=%s",
+            self.source.slug,
+            len(requests),
+            self._pages_claimed,
+            self.max_pages or "unlimited",
+        )
         return requests
 
     def _on_idle(self, spider: scrapy.Spider) -> None:

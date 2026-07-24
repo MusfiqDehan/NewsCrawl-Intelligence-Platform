@@ -5,6 +5,7 @@ Run with:  python -m newscrawl_processor.run_embedding_worker [--once] [--batch-
 
 import argparse
 import asyncio
+import contextlib
 import os
 import socket
 import uuid
@@ -15,12 +16,16 @@ from newscrawl_api.coordination.queues import QueueMessage
 from newscrawl_api.db import dispose_engine, session_scope
 from newscrawl_api.models import Article
 from newscrawl_api.observability import configure_logging, get_logger
-from newscrawl_api.services.embedding_backend import get_embedding_backend
+from newscrawl_api.services.embedding_backend import (
+    SentenceTransformerBackend,
+    set_embedding_backend,
+)
 from newscrawl_contracts.enums import WorkerType
 from newscrawl_contracts.messages import EmbeddingMessage
 from newscrawl_contracts.streams import GROUP_PROCESSORS, STREAM_EMBEDDING
 from redis.asyncio import Redis
 
+from newscrawl_processor.embed_server import start_embed_server
 from newscrawl_processor.embeddings import EmbeddingService
 from newscrawl_processor.metrics import (
     DUPLICATES,
@@ -74,6 +79,25 @@ class EmbeddingWorker:
                         MESSAGES.labels(worker="embedding", outcome="missing").inc()
                         await self.queue.ack(message)
                         return
+                    # English crawled first and filled the stream head; defer once
+                    # so Bangla (and other languages) are not starved for days.
+                    if article.language == "en" and payload.defer_count < 1:
+                        deferred = EmbeddingMessage(
+                            article_id=payload.article_id,
+                            kinds=payload.kinds,
+                            defer_count=payload.defer_count + 1,
+                        )
+                        await self.queue.publish(
+                            STREAM_EMBEDDING, deferred.model_dump(mode="json")
+                        )
+                        await self.queue.ack(message)
+                        MESSAGES.labels(worker="embedding", outcome="deferred").inc()
+                        log.info(
+                            "embedding_deferred_for_language_fairness",
+                            article_id=str(payload.article_id),
+                            language=article.language,
+                        )
+                        return
                     result = await self.service.embed_article(db, article, payload.kinds)
         except Exception as exc:
             log.exception("embedding_failed", article_id=str(payload.article_id))
@@ -112,13 +136,24 @@ async def run(once: bool, batch_size: int) -> None:
     await queue.ensure_group(STREAM_EMBEDDING)
 
     log.info("loading_embedding_model", model=settings.embedding_model)
-    backend = get_embedding_backend()
+    # Always load locally here — never follow EMBEDDING_SERVICE_URL (that points at us).
+    backend = SentenceTransformerBackend(
+        settings.embedding_model,
+        settings.embedding_dimension,
+        settings.embedding_device,
+    )
+    set_embedding_backend(backend)
     service = EmbeddingService(backend, version=settings.embedding_version)
 
     shutdown = GracefulShutdown()
     shutdown.install()
     heartbeat = Heartbeat(redis, worker_id=worker_id, worker_type=WorkerType.PROCESSOR)
     await heartbeat.start()
+
+    # Internal encode HTTP for API semantic search (avoids loading torch in API).
+    encode_task = await start_embed_server(
+        backend, host="0.0.0.0", port=settings.embedding_service_port
+    )
 
     worker = EmbeddingWorker(queue, service, batch_size=batch_size)
     metrics_port = start_metrics_server("embedding")
@@ -128,6 +163,7 @@ async def run(once: bool, batch_size: int) -> None:
         model=backend.model_name,
         once=once,
         metrics_port=metrics_port,
+        encode_port=settings.embedding_service_port,
     )
     try:
         while not await shutdown.wait(timeout=0):
@@ -135,6 +171,9 @@ async def run(once: bool, batch_size: int) -> None:
             if once and handled == 0:
                 break
     finally:
+        encode_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await encode_task
         await heartbeat.stop()
         await redis.aclose()
         await dispose_engine()

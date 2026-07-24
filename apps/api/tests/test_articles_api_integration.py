@@ -132,6 +132,47 @@ async def seeded_articles(
 
 async def test_articles_require_auth(client: httpx.AsyncClient) -> None:
     assert (await client.get("/api/v1/articles")).status_code == 401
+    assert (await client.get("/api/v1/search/semantic", params={"q": "flood"})).status_code == 401
+
+
+async def test_public_articles_no_auth(
+    client: httpx.AsyncClient,
+    seeded_articles: dict[str, uuid.UUID],
+) -> None:
+    response = await client.get(
+        "/api/v1/public/articles",
+        params={"q": "flood"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] >= 2
+    titles = {item["title"] for item in body["items"]}
+    assert "Flood alert issued" in titles
+
+    detail = await client.get(f"/api/v1/public/articles/{seeded_articles['flood1']}")
+    assert detail.status_code == 200
+    assert detail.json()["title"] == "Flood alert issued"
+
+
+async def test_public_semantic_search_no_auth(
+    client: httpx.AsyncClient,
+    seeded_articles: dict[str, uuid.UUID],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from newscrawl_api.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "embedding_model", "fake-embedder")
+    monkeypatch.setattr(settings, "embedding_version", 1)
+
+    response = await client.get(
+        "/api/v1/public/search/semantic",
+        params={"q": "flood waters everywhere"},
+    )
+    assert response.status_code == 200
+    results = response.json()["results"]
+    assert results
+    assert results[0]["article"]["id"] == str(seeded_articles["flood1"])
 
 
 async def test_list_articles_with_filters(

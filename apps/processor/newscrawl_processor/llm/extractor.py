@@ -25,20 +25,43 @@ from newscrawl_processor.llm.schema import ArticleAnalysis, analysis_json_schema
 
 log = get_logger()
 
-MAX_BODY_CHARS = 12_000
+MAX_BODY_CHARS = 1_200
 
 SYSTEM_PROMPT = (
     "You are a news analysis engine. You receive one news article (Bangla or "
     "English) and return ONLY a single JSON object matching exactly this "
     "schema, with no markdown fences and no commentary:\n"
     f"{analysis_json_schema()}\n"
+    "Required keys (use exactly these names): summary, topics, entities, "
+    "sentiment, event_type, political_category, keywords.\n"
+    "Example (structure only):\n"
+    '{"summary":"Officials announced a new policy after talks in Dhaka.",'
+    '"topics":["policy","government"],'
+    '"entities":[{"name":"Dhaka","type":"location"}],'
+    '"sentiment":"neutral","event_type":"policy announcement",'
+    '"political_category":"governance","keywords":["policy","Dhaka"]}\n'
     "Write the summary in the same language as the article. Use null (not "
     "empty strings) for event_type/political_category when not applicable."
 )
 
+# Compact prompt for CPU/local models — long schemas make prompt-eval dominate.
+LOCAL_SYSTEM_PROMPT = (
+    "Analyze one news article. Reply with ONLY a JSON object using exactly "
+    "these keys: summary, topics, entities, sentiment, event_type, "
+    "political_category, keywords.\n"
+    "summary = 2-4 sentences in the article language; "
+    "topics = up to 8 short phrases; "
+    'entities = [{"name":"...","type":"person|organization|location|event|other"}]; '
+    "sentiment = positive|negative|neutral|mixed; "
+    "event_type and political_category = short label or null; "
+    "keywords = up to 12 words. No markdown, no extra keys."
+)
+
 _CORRECTIVE_NOTE = (
     "\n\nIMPORTANT: your previous reply was not valid JSON for the schema. "
-    "Reply with ONLY the JSON object, no code fences, no explanations."
+    "Reply with ONLY one JSON object using exactly these keys: summary, "
+    "topics, entities, sentiment, event_type, political_category, keywords. "
+    "No other keys. No code fences. No explanations."
 )
 
 _JSON_BLOCK = re.compile(r"\{.*\}", re.S)
@@ -96,7 +119,9 @@ def recover_json(text: str) -> dict[str, object]:
             raise MalformedResponseError(f"Unparseable JSON: {exc}") from exc
     if not isinstance(parsed, dict):
         raise MalformedResponseError(f"Expected JSON object, got {type(parsed).__name__}")
-    return parsed
+    # Small local models often invent extra keys; drop unknowns before validation.
+    allowed = set(ArticleAnalysis.model_fields)
+    return {key: value for key, value in parsed.items() if key in allowed}
 
 
 def build_user_prompt(title: str, body: str, language: str) -> str:
@@ -126,18 +151,23 @@ class LlmExtractor:
 
         for provider in self.providers:
             prompt = user_prompt
+            system = LOCAL_SYSTEM_PROMPT if provider.name == "ollama" else SYSTEM_PROMPT
             for attempt in range(1, self.max_retries + 1):
                 usage.attempts += 1
                 try:
-                    completion = await provider.complete(SYSTEM_PROMPT, prompt)
+                    completion = await provider.complete(system, prompt)
                 except LLMProviderError as exc:
                     usage.errors.append(str(exc))
                     log.warning(
                         "llm_provider_error",
                         provider=provider.name,
                         attempt=attempt,
+                        retryable=exc.retryable,
                         error=str(exc),
                     )
+                    # Quota/auth failures (e.g. Gemini 429) → next provider immediately.
+                    if not exc.retryable:
+                        break
                     if attempt < self.max_retries:
                         await asyncio.sleep(self.backoff_base_seconds * 2 ** (attempt - 1))
                     continue

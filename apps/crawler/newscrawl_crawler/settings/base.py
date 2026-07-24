@@ -70,7 +70,8 @@ ITEM_PIPELINES = {
 
 # ── Observability ────────────────────────────────────────────────────────────
 EXTENSIONS = {
-    "newscrawl_crawler.extensions.PrometheusStatsExtension": 500,
+    "scrapy.extensions.closespider.CloseSpider": 500,
+    "newscrawl_crawler.extensions.PrometheusStatsExtension": 510,
 }
 PROMETHEUS_METRICS_ENABLED = True
 PROMETHEUS_METRICS_PORT = 9101  # override with CRAWLER_METRICS_PORT env var

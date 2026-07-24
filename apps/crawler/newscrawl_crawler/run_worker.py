@@ -35,14 +35,78 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--job", help="run this crawl job id to completion", default=None)
     parser.add_argument("--once", action="store_true", help="run a single pass and exit")
     parser.add_argument("--batch-size", type=int, default=20)
-    parser.add_argument("--interval", type=float, default=60.0, help="seconds between passes")
+    parser.add_argument("--interval", type=float, default=15.0, help="seconds between passes")
     parser.add_argument(
         "--max-pages",
         type=int,
-        default=0,
+        # Cap each source pass so one fat frontier (e.g. Prothom Alo) cannot
+        # monopolize the only crawler forever. 0 = unlimited (ops override).
+        default=25,
         help="cap fetched pages per spider pass (0 = unlimited)",
     )
     return parser.parse_args(argv)
+
+
+async def _fair_source_order(sources: list[Any]) -> list[Any]:
+    """Prefer starved sources (few articles, pending discovery hubs) first."""
+    from newscrawl_api.db import session_scope
+    from newscrawl_api.models import Article, CrawlUrl
+    from newscrawl_contracts.enums import UrlStatus, UrlType
+    from sqlalchemy import func, select
+
+    if len(sources) <= 1:
+        return sources
+
+    ids = [s.id for s in sources]
+    async with session_scope() as db:
+        art_rows = (
+            await db.execute(
+                select(Article.source_id, func.count())
+                .where(Article.source_id.in_(ids))
+                .group_by(Article.source_id)
+            )
+        ).all()
+        art_counts = {row[0]: int(row[1]) for row in art_rows}
+
+        hub_types = (
+            UrlType.HOMEPAGE,
+            UrlType.SECTION,
+            UrlType.RSS,
+            UrlType.SITEMAP,
+        )
+        hub_rows = (
+            await db.execute(
+                select(CrawlUrl.source_id, func.count())
+                .where(
+                    CrawlUrl.source_id.in_(ids),
+                    CrawlUrl.status.in_([UrlStatus.QUEUED, UrlStatus.RETRY_PENDING]),
+                    CrawlUrl.url_type.in_(hub_types),
+                )
+                .group_by(CrawlUrl.source_id)
+            )
+        ).all()
+        hub_pending = {row[0]: int(row[1]) for row in hub_rows}
+
+        due_rows = (
+            await db.execute(
+                select(CrawlUrl.source_id, func.count())
+                .where(
+                    CrawlUrl.source_id.in_(ids),
+                    CrawlUrl.status.in_([UrlStatus.QUEUED, UrlStatus.RETRY_PENDING]),
+                )
+                .group_by(CrawlUrl.source_id)
+            )
+        ).all()
+        due_counts = {row[0]: int(row[1]) for row in due_rows}
+
+    def sort_key(source: Any) -> tuple[int, int, int, str]:
+        # Lower tuple sorts first: fewest articles, then hubs waiting, then due work.
+        articles = art_counts.get(source.id, 0)
+        hubs = hub_pending.get(source.id, 0)
+        due = due_counts.get(source.id, 0)
+        return (articles, -hubs, -due, source.slug)
+
+    return sorted(sources, key=sort_key)
 
 
 async def _load_sources(slug: str | None) -> list[SourceConfig]:
@@ -169,6 +233,7 @@ async def orchestrate(args: argparse.Namespace) -> None:
             source_config=source.model_dump_json(),
             batch_size=args.batch_size,
             crawl_job_id=crawl_job_id,
+            max_pages=args.max_pages,
         )
         await deferred.asFuture(loop)
         log.info("spider_pass_finished", source=source.slug, job=crawl_job_id)
@@ -194,6 +259,13 @@ async def orchestrate(args: argparse.Namespace) -> None:
             sources = await _load_sources(args.source)
             if not sources:
                 log.warning("no_enabled_sources", source_filter=args.source)
+            else:
+                sources = await _fair_source_order(sources)
+                log.info(
+                    "pass_source_order",
+                    sources=[s.slug for s in sources],
+                    max_pages=args.max_pages or None,
+                )
 
             for source in sources:
                 # (method call, not the property — mypy narrows properties)

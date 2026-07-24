@@ -15,9 +15,11 @@ from newscrawl_contracts.enums import UrlType
 DEFAULT_TYPE_WEIGHTS: dict[UrlType, float] = {
     UrlType.HOMEPAGE: 8.0,
     UrlType.RSS: 7.0,
-    UrlType.SITEMAP: 6.0,
-    UrlType.ARTICLE: 5.0,
-    UrlType.SECTION: 3.0,
+    UrlType.SITEMAP: 6.5,
+    # Sections must outrank articles so discovery hubs keep getting turns
+    # even when a source already has a large article backlog.
+    UrlType.SECTION: 6.0,
+    UrlType.ARTICLE: 4.0,
     UrlType.OTHER: 0.5,
 }
 

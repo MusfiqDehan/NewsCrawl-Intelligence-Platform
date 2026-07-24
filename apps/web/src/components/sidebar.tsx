@@ -12,11 +12,12 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
-import { clearToken } from "@/lib/api";
+import { logoutRemote } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Brand } from "@/components/logo";
 
 const links = [
-  { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/jobs", label: "Crawl Jobs", icon: ListTodo },
   { href: "/sources", label: "Sources", icon: Globe },
   { href: "/articles", label: "Articles", icon: Newspaper },
@@ -31,18 +32,16 @@ export function Sidebar() {
   return (
     <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-slate-800 bg-slate-950">
       <div className="flex items-center gap-2 px-5 py-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-600 text-sm font-bold text-white">
-          N
-        </div>
-        <div>
-          <div className="text-sm font-semibold text-white">NewsCrawl</div>
-          <div className="text-xs text-slate-500">Intelligence Platform</div>
-        </div>
+        <Link href="/" className="flex items-center gap-2">
+          <Brand showTagline />
+        </Link>
       </div>
       <nav className="flex-1 space-y-1 px-3 py-2">
         {links.map(({ href, label, icon: Icon }) => {
           const active =
-            href === "/" ? pathname === "/" : pathname.startsWith(href);
+            href === "/dashboard"
+              ? pathname === "/dashboard"
+              : pathname.startsWith(href);
           return (
             <Link
               key={href}
@@ -62,8 +61,8 @@ export function Sidebar() {
       </nav>
       <div className="border-t border-slate-800 p-3">
         <button
-          onClick={() => {
-            clearToken();
+          onClick={async () => {
+            await logoutRemote();
             router.push("/login");
           }}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-400 transition-colors hover:bg-slate-900 hover:text-slate-200"

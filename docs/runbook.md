@@ -67,8 +67,10 @@ hostnames; make sure DNS for `newscrawl.musfiqdehan.com` and
 ### LLM spend spike
 
 - Grafana → Processing & LLM → token burn-down, or `GET /api/v1/stats/llm/daily`.
-- Set `LLM_PROVIDER=ollama` (self-hosted) or pause LLM enrichment by scaling
-  the worker to zero: `docker compose … up -d --scale processor-llm=0`.
+- Fall back to local Ollama (`LLM_FALLBACK_PROVIDERS=ollama` is the default prod
+  hybrid mode) or switch fully local with `LLM_PROVIDER=ollama` and empty cloud
+  keys. Pause enrichment by scaling the worker to zero:
+  `docker compose … up -d --scale processor-llm=0`.
   Cleaning and embeddings continue; articles keep flowing without enrichment.
 
 ### Postgres disk pressure
