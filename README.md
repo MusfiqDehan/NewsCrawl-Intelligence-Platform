@@ -1,5 +1,14 @@
 # NewsCrawl Intelligence Platform
 
+**Live demo:** [https://newscrawl.musfiqdehan.com/](https://newscrawl.musfiqdehan.com/)
+
+| | |
+| --- | --- |
+| **Email** | `admin@musfiqdehan.com` |
+| **Password** | `Nc!ETnoZJRy8GTfX56wuMxg9A` |
+
+Public semantic search (no login): [https://newscrawl.musfiqdehan.com/explore](https://newscrawl.musfiqdehan.com/explore)
+
 A production-grade, distributed, multilingual (Bangla + English) news crawling and intelligence platform.
 
 It crawls configured news sources (Prothom Alo, Kaler Kantho, Naya Diganta, BBC / BBC Bangla, Al Jazeera - extensible to more), stores raw content in S3-compatible object storage, processes articles through a queue-based pipeline (cleaning -> language detection -> deduplication -> LLM extraction -> embeddings), and serves everything through a FastAPI control/query plane and a Next.js operations dashboard with multilingual semantic search.
