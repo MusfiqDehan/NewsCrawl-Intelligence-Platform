@@ -48,6 +48,10 @@ class EmbeddingMessage(QueueMessage):
     kinds: list[EmbeddingKind] = Field(
         default_factory=lambda: [EmbeddingKind.TITLE, EmbeddingKind.BODY]
     )
+    # English backlog can starve Bangla on CPU hosts; worker may push a message
+    # to the end of the stream once (defer_count=1) so underrepresented languages
+    # catch up.
+    defer_count: int = 0
 
 
 class DeadLetterMessage(QueueMessage):
