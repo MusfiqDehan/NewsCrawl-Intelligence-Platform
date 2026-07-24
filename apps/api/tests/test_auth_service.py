@@ -5,7 +5,9 @@ from newscrawl_api.config import Settings
 from newscrawl_api.services.auth import (
     AuthError,
     create_access_token,
+    create_refresh_token,
     decode_access_token,
+    decode_refresh_token,
     hash_password,
     verify_password,
 )
@@ -30,6 +32,33 @@ def test_token_roundtrip() -> None:
     payload = decode_access_token(settings, token)
     assert payload["sub"] == str(user_id)
     assert payload["role"] == "admin"
+    assert payload["typ"] == "access"
+
+
+def test_refresh_token_roundtrip() -> None:
+    settings = make_settings()
+    user_id = uuid.uuid4()
+    token, jti = create_refresh_token(settings, user_id=user_id)
+    payload = decode_refresh_token(settings, token)
+    assert payload["sub"] == str(user_id)
+    assert payload["jti"] == jti
+    assert payload["typ"] == "refresh"
+
+
+def test_refresh_token_rejected_as_access() -> None:
+    settings = make_settings()
+    token, _ = create_refresh_token(settings, user_id=uuid.uuid4())
+    with pytest.raises(AuthError, match="Invalid token type"):
+        decode_access_token(settings, token)
+
+
+def test_access_token_rejected_as_refresh() -> None:
+    settings = make_settings()
+    token = create_access_token(
+        settings, user_id=uuid.uuid4(), email="a@b.com", role=UserRole.VIEWER
+    )
+    with pytest.raises(AuthError, match="Invalid token type"):
+        decode_refresh_token(settings, token)
 
 
 def test_tampered_token_rejected() -> None:
