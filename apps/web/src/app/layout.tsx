@@ -24,7 +24,7 @@ const hind = Hind_Siliguri({
 });
 
 export const metadata: Metadata = {
-  title: "NewsCrawl - Multilingual News Intelligence",
+  title: "NewsCrawl | Multilingual News Intelligence",
   description:
     "Distributed Bangla + English news crawling, LLM extraction, and semantic search for operators who need signal, not noise.",
   icons: {
