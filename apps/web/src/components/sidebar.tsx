@@ -8,6 +8,7 @@ import {
   LogOut,
   Newspaper,
   Search,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -21,6 +22,7 @@ const links = [
   { href: "/jobs", label: "Crawl Jobs", icon: ListTodo },
   { href: "/sources", label: "Sources", icon: Globe },
   { href: "/articles", label: "Articles", icon: Newspaper },
+  { href: "/retention", label: "Deleted Articles", icon: Trash2 },
   { href: "/search", label: "Semantic Search", icon: Search },
   { href: "/system", label: "System", icon: Activity },
 ];
