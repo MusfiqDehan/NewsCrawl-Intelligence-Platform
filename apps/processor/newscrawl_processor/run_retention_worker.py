@@ -1,7 +1,7 @@
 """Article retention scheduler.
 
 Deletes articles older than ARTICLE_RETENTION_HOURS (default 24) on a fixed
-interval of ARTICLE_RETENTION_INTERVAL_HOURS (default 12).
+interval of ARTICLE_RETENTION_INTERVAL_MINUTES (default 5).
 
 Run with:  python -m newscrawl_processor.run_retention_worker [--once]
 """
@@ -49,6 +49,12 @@ async def run_cycle() -> int:
     return deleted
 
 
+def _interval_seconds(settings) -> int:
+    if settings.article_retention_interval_minutes > 0:
+        return max(60, int(settings.article_retention_interval_minutes * 60))
+    return max(60, int(settings.article_retention_interval_hours * 3600))
+
+
 async def run(*, once: bool) -> None:
     settings = get_settings()
     worker_id = f"processor-retention-{socket.gethostname()}-{os.getpid()}-{uuid.uuid4().hex[:6]}"
@@ -61,12 +67,12 @@ async def run(*, once: bool) -> None:
     await heartbeat.start()
 
     metrics_port = start_metrics_server("retention")
-    interval_seconds = max(60, settings.article_retention_interval_hours * 3600)
+    interval_seconds = _interval_seconds(settings)
     log.info(
         "retention_worker_started",
         worker_id=worker_id,
         retention_hours=settings.article_retention_hours,
-        interval_hours=settings.article_retention_interval_hours,
+        interval_seconds=interval_seconds,
         once=once,
         metrics_port=metrics_port,
     )
@@ -74,13 +80,16 @@ async def run(*, once: bool) -> None:
     try:
         while not await shutdown.wait(timeout=0):
             try:
-                await run_cycle()
+                deleted = await run_cycle()
             except Exception:
                 log.exception("retention_cycle_failed")
                 MESSAGES.labels(worker="retention", outcome="error").inc()
+                deleted = 0
             if once:
                 break
-            # Sleep in small slices so SIGTERM can interrupt between cycles.
+            # Keep draining until the window is clean, then rest.
+            if deleted > 0:
+                continue
             remaining = float(interval_seconds)
             while remaining > 0 and not await shutdown.wait(timeout=min(30.0, remaining)):
                 remaining -= 30.0
