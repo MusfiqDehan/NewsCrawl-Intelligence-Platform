@@ -10,6 +10,7 @@ import type {
   CrawlJobList,
   Overview,
   QueueDepths,
+  RetentionStats,
   ScoredArticle,
   SemanticSearchResult,
   SentimentBucket,
@@ -175,5 +176,13 @@ export function useQueues() {
     queryKey: ["queues"],
     queryFn: () => api<QueueDepths>("/queues"),
     refetchInterval: 10_000,
+  });
+}
+
+export function useRetentionStats() {
+  return useQuery({
+    queryKey: ["retention-stats"],
+    queryFn: () => api<RetentionStats>("/stats/retention", { params: { days: 14, cycle_limit: 40 } }),
+    refetchInterval: 15_000,
   });
 }
