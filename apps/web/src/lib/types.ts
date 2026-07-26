@@ -166,3 +166,49 @@ export interface QueueDepths {
   delayed: number;
   dead_letter: number;
 }
+
+export interface RetentionDayPoint {
+  day: string;
+  articles_deleted: number;
+  cycles: number;
+  raw_html_deleted: number;
+}
+
+export interface RetentionCycle {
+  id: number;
+  started_at: string;
+  finished_at: string;
+  cutoff_at: string;
+  retention_hours: number;
+  articles_deleted: number;
+  batches: number;
+  raw_html_deleted: number;
+  by_language: Record<string, number>;
+  by_source: Record<string, number>;
+  status: string;
+  error_message: string | null;
+  duration_seconds: number;
+}
+
+export interface RetentionStats {
+  retention_hours: number;
+  interval_minutes: number;
+  total_deleted: number;
+  deleted_last_24h: number;
+  deleted_today: number;
+  cycles_today: number;
+  live_articles: number;
+  overdue_live_articles: number;
+  last_cycle_at: string | null;
+  last_cycle_deleted: number;
+  estimated_deleted_before_tracking: number;
+  deleted_per_day: RetentionDayPoint[];
+  by_language: { language: string; articles_deleted: number }[];
+  by_source: {
+    source_id: string;
+    source_name: string;
+    source_slug: string;
+    articles_deleted: number;
+  }[];
+  recent_cycles: RetentionCycle[];
+}
