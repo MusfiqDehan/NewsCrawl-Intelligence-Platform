@@ -134,6 +134,9 @@ services:
     restart: unless-stopped
     command: ["python", "-m", "newscrawl_processor.run_worker"]
     env_file: env.prod
+    volumes:
+      - ./apps/processor/newscrawl_processor:/app/apps/processor/newscrawl_processor
+      - ./apps/api/newscrawl_api:/app/apps/api/newscrawl_api:ro
     networks:
       - internal
     depends_on:
@@ -201,7 +204,7 @@ services:
     env_file: env.prod
     volumes:
       - ./apps/processor/newscrawl_processor:/app/apps/processor/newscrawl_processor
-      - ./apps/api/newscrawl_api/config/settings.py:/app/apps/api/newscrawl_api/config/settings.py:ro
+      - ./apps/api/newscrawl_api:/app/apps/api/newscrawl_api:ro
     networks:
       - internal
     depends_on:

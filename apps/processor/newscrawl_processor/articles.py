@@ -13,6 +13,7 @@ import uuid
 from dataclasses import dataclass
 
 from newscrawl_api.models import Article, ArticleVersion
+from newscrawl_api.services.article_daily_stats import increment_daily_article_count
 from newscrawl_contracts.enums import ExtractionMethod
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -87,6 +88,7 @@ class ArticleService:
         db.add(article)
         await db.flush()
         db.add(_version_snapshot(article, version=1))
+        await increment_daily_article_count(db)
         await db.commit()
         return PersistResult(action="created", article_id=article.id, version=1)
 

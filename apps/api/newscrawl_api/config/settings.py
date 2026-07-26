@@ -81,8 +81,11 @@ class Settings(BaseSettings):
 
     # ── Article retention ────────────────────────────────────────────────────
     # Delete articles older than this age; scheduler wakes this often.
+    # Short wake interval keeps the live corpus inside the 24h window.
     article_retention_hours: int = 24
-    article_retention_interval_hours: int = 12
+    article_retention_interval_minutes: int = 5
+    # Legacy alias (hours). Used only when minutes is unset/zero.
+    article_retention_interval_hours: float = 0
 
     @property
     def cors_origins(self) -> list[str]:

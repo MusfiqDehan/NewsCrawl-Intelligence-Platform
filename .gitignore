@@ -1,6 +1,8 @@
 # Central Traefik deployment — separate repository, not part of this monorepo
 /traefik/
 .cursor/
+.cursorrules
+CLAUDE.md
 
 # Python
 __pycache__/

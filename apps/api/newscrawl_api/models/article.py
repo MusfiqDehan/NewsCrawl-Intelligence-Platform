@@ -1,15 +1,24 @@
 """Article storage: articles, versions, entities, topics, embeddings."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from newscrawl_contracts.enums import EmbeddingKind, EntityType, ExtractionMethod
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, ForeignKey, Index, String, Text, UniqueConstraint, text
+from sqlalchemy import BigInteger, Date, ForeignKey, Index, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from newscrawl_api.models.base import Base, TimestampMixin, str_enum, uuid_pk
+
+
+class ArticleDailyStat(Base):
+    """Durable per-day crawl counts that survive 24h article retention."""
+
+    __tablename__ = "article_daily_stats"
+
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    articles_created: Mapped[int] = mapped_column(default=0)
 
 
 class Article(Base, TimestampMixin):

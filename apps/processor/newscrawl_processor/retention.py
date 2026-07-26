@@ -2,11 +2,13 @@
 
 Clears dependent rows first (no ON DELETE CASCADE), best-effort removes raw
 HTML from object storage, then deletes the article rows in batches.
+Every cycle is recorded for the deletion-stats dashboard.
 """
 
 from __future__ import annotations
 
 import re
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlparse
@@ -27,6 +29,8 @@ from newscrawl_api.models import (
     ProcessingJob,
 )
 from newscrawl_api.observability import get_logger
+from newscrawl_api.services.article_daily_stats import sync_daily_stats_from_live_articles
+from newscrawl_api.services.retention_stats import record_purge_cycle, tally_batch
 
 log = get_logger()
 
@@ -100,53 +104,104 @@ async def purge_expired_articles(
 ) -> int:
     """Delete articles with created_at older than retention_hours. Returns deleted count."""
     hours = retention_hours if retention_hours is not None else settings.article_retention_hours
-    cutoff = datetime.now(UTC) - timedelta(hours=hours)
+    started_at = datetime.now(UTC)
+    cutoff = started_at - timedelta(hours=hours)
     total_deleted = 0
+    batches = 0
+    raw_html_deleted = 0
+    by_language: Counter[str] = Counter()
+    by_source: Counter[str] = Counter()
+    status = "completed"
+    error_message: str | None = None
 
-    for _ in range(max_batches):
-        rows = (
-            await db.execute(
-                select(Article.id, Article.raw_html_location)
-                .where(Article.created_at < cutoff)
-                .order_by(Article.created_at.asc())
-                .limit(batch_size)
-            )
-        ).all()
-        if not rows:
-            break
-
-        article_ids = [row.id for row in rows]
-        locations = [row.raw_html_location for row in rows if row.raw_html_location]
-
-        # Break self-FK references from articles that may still be retained.
-        await db.execute(
-            update(Article)
-            .where(Article.duplicate_of.in_(article_ids))
-            .values(duplicate_of=None)
-        )
-
-        for table, column in (
-            (ArticleEmbedding, ArticleEmbedding.article_id),
-            (ArticleEntity, ArticleEntity.article_id),
-            (ArticleTopic, ArticleTopic.article_id),
-            (ArticleVersion, ArticleVersion.article_id),
-            (LlmExtraction, LlmExtraction.article_id),
-            (ProcessingJob, ProcessingJob.article_id),
-        ):
-            await db.execute(delete(table).where(column.in_(article_ids)))
-
-        await db.execute(delete(Article).where(Article.id.in_(article_ids)))
+    try:
+        # Snapshot live day totals into durable stats before rows disappear.
+        await sync_daily_stats_from_live_articles(db)
         await db.commit()
 
-        if locations:
-            delete_raw_html_objects(settings, locations)
+        for _ in range(max_batches):
+            rows = (
+                await db.execute(
+                    select(
+                        Article.id,
+                        Article.raw_html_location,
+                        Article.language,
+                        Article.source_id,
+                    )
+                    .where(Article.created_at < cutoff)
+                    .order_by(Article.created_at.asc())
+                    .limit(batch_size)
+                )
+            ).all()
+            if not rows:
+                break
 
-        total_deleted += len(article_ids)
-        log.info(
-            "retention_batch_deleted",
-            deleted=len(article_ids),
-            cutoff=cutoff.isoformat(),
-            total=total_deleted,
-        )
+            article_ids = [row.id for row in rows]
+            locations = [row.raw_html_location for row in rows if row.raw_html_location]
+            lang_counts, src_counts = tally_batch(
+                [row.language for row in rows],
+                [row.source_id for row in rows],
+            )
+            by_language.update(lang_counts)
+            by_source.update(src_counts)
+
+            # Break self-FK references from articles that may still be retained.
+            await db.execute(
+                update(Article)
+                .where(Article.duplicate_of.in_(article_ids))
+                .values(duplicate_of=None)
+            )
+
+            for table, column in (
+                (ArticleEmbedding, ArticleEmbedding.article_id),
+                (ArticleEntity, ArticleEntity.article_id),
+                (ArticleTopic, ArticleTopic.article_id),
+                (ArticleVersion, ArticleVersion.article_id),
+                (LlmExtraction, LlmExtraction.article_id),
+                (ProcessingJob, ProcessingJob.article_id),
+            ):
+                await db.execute(delete(table).where(column.in_(article_ids)))
+
+            await db.execute(delete(Article).where(Article.id.in_(article_ids)))
+            await db.commit()
+
+            if locations:
+                raw_html_deleted += delete_raw_html_objects(settings, locations)
+
+            batches += 1
+            total_deleted += len(article_ids)
+            log.info(
+                "retention_batch_deleted",
+                deleted=len(article_ids),
+                cutoff=cutoff.isoformat(),
+                total=total_deleted,
+            )
+    except Exception as exc:
+        status = "error"
+        error_message = f"{type(exc).__name__}: {exc}"
+        log.exception("retention_purge_failed")
+        raise
+    finally:
+        finished_at = datetime.now(UTC)
+        try:
+            await db.rollback()
+            await record_purge_cycle(
+                db,
+                started_at=started_at,
+                finished_at=finished_at,
+                cutoff_at=cutoff,
+                retention_hours=hours,
+                articles_deleted=total_deleted,
+                batches=batches,
+                raw_html_deleted=raw_html_deleted,
+                by_language=dict(by_language),
+                by_source=dict(by_source),
+                status=status,
+                error_message=error_message,
+            )
+            await db.commit()
+        except Exception:
+            log.exception("retention_stats_record_failed")
+            await db.rollback()
 
     return total_deleted
