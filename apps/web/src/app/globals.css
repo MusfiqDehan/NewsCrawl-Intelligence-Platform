@@ -1,23 +1,42 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  color-scheme: dark;
-  --nc-ink: #020617;
-  --nc-panel: #0b1220;
-  --nc-line: #1e293b;
-  --nc-mist: #94a3b8;
-  --nc-signal: #0ea5e9;
-  --nc-signal-soft: rgba(14, 165, 233, 0.16);
+  color-scheme: light;
+  --nc-ink: #f8fafc;
+  --nc-panel: #ffffff;
+  --nc-panel-soft: #f1f5f9;
+  --nc-line: #e2e8f0;
+  --nc-text: #0f172a;
+  --nc-mist: #64748b;
+  --nc-signal: #0284c7;
+  --nc-signal-soft: rgba(2, 132, 199, 0.1);
   /* App UI (dashboard, explore, login): Hind Siliguri for Bangla + Latin. */
   --font-sans: var(--font-hind);
   --font-display: var(--font-hind);
 }
 
+.dark {
+  color-scheme: dark;
+  --nc-ink: #020617;
+  --nc-panel: #0b1220;
+  --nc-panel-soft: #0f172a;
+  --nc-line: #1e293b;
+  --nc-text: #e2e8f0;
+  --nc-mist: #94a3b8;
+  --nc-signal: #0ea5e9;
+  --nc-signal-soft: rgba(14, 165, 233, 0.16);
+}
+
 body {
   background-color: var(--nc-ink);
-  color: #e2e8f0;
+  color: var(--nc-text);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: "tnum";
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
 }
 
 /* Homepage keeps the original Manrope + Syne pairing. */
@@ -33,7 +52,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--nc-line);
   border-radius: 4px;
 }
 
@@ -49,6 +68,37 @@ body {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes nc-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes nc-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes nc-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -68,6 +118,15 @@ body {
   }
   50% {
     opacity: 0.7;
+  }
+}
+
+@keyframes nc-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
   }
 }
 
@@ -95,10 +154,70 @@ body {
   animation: nc-pulse-line 3.6s ease-in-out infinite;
 }
 
+.nc-fade-in {
+  animation: nc-fade-in 0.4s ease both;
+}
+
+.nc-rise {
+  animation: nc-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.nc-scale-in {
+  animation: nc-scale-in 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.nc-stagger > * {
+  animation: nc-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.nc-stagger > *:nth-child(1) {
+  animation-delay: 0.02s;
+}
+.nc-stagger > *:nth-child(2) {
+  animation-delay: 0.06s;
+}
+.nc-stagger > *:nth-child(3) {
+  animation-delay: 0.1s;
+}
+.nc-stagger > *:nth-child(4) {
+  animation-delay: 0.14s;
+}
+.nc-stagger > *:nth-child(5) {
+  animation-delay: 0.18s;
+}
+.nc-stagger > *:nth-child(n + 6) {
+  animation-delay: 0.2s;
+}
+
+.nc-skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--nc-panel-soft);
+}
+
+.nc-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    100deg,
+    transparent 20%,
+    var(--nc-line) 45%,
+    transparent 70%
+  );
+  background-size: 250% 100%;
+  animation: nc-shimmer 1.6s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nc-fade-up,
+  .nc-fade-in,
+  .nc-rise,
+  .nc-scale-in,
+  .nc-stagger > *,
   .nc-grid-drift,
-  .nc-pulse-line {
+  .nc-pulse-line,
+  .nc-skeleton::after {
     animation: none !important;
   }
 }
