@@ -15,7 +15,9 @@ import type {
   SemanticSearchResult,
   SentimentBucket,
   Source,
+  SourceCreatePayload,
   SourceHealth,
+  SourceUpdatePayload,
   Worker,
 } from "./types";
 
@@ -47,6 +49,30 @@ export function useSources() {
   return useQuery({
     queryKey: ["sources"],
     queryFn: () => api<Source[]>("/sources"),
+  });
+}
+
+export function useCreateSource() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SourceCreatePayload) =>
+      api<Source>("/sources", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sources"] });
+      queryClient.invalidateQueries({ queryKey: ["source-health"] });
+    },
+  });
+}
+
+export function useUpdateSource() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string } & SourceUpdatePayload) =>
+      api<Source>(`/sources/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sources"] });
+      queryClient.invalidateQueries({ queryKey: ["source-health"] });
+    },
   });
 }
 
