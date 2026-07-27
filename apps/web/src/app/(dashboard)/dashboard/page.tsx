@@ -16,6 +16,7 @@ import {
 
 import { Card, CardTitle, Spinner, StatusBadge } from "@/components/ui";
 import { useOverview, useQueues, useSentiment } from "@/lib/hooks";
+import { useTheme } from "@/lib/theme";
 import { formatNumber } from "@/lib/utils";
 
 const SENTIMENT_COLORS: Record<string, string> = {
@@ -34,10 +35,10 @@ const SENTIMENT_LABELS: Record<string, string> = {
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <Card>
-      <div className="text-sm text-slate-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold text-white">{value}</div>
-      {sub && <div className="mt-1 text-xs text-slate-500">{sub}</div>}
+    <Card interactive>
+      <div className="text-sm text-slate-500 dark:text-slate-500">{label}</div>
+      <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">{value}</div>
+      {sub && <div className="mt-1 text-xs text-slate-500 dark:text-slate-500">{sub}</div>}
     </Card>
   );
 }
@@ -46,6 +47,16 @@ export default function OverviewPage() {
   const { data: overview, isLoading } = useOverview();
   const { data: sentiment } = useSentiment();
   const { data: queues } = useQueues();
+  const { resolvedTheme } = useTheme();
+  const dark = resolvedTheme === "dark";
+  const chart = {
+    grid: dark ? "#1e293b" : "#e2e8f0",
+    axis: dark ? "#64748b" : "#94a3b8",
+    tooltipBg: dark ? "#0f172a" : "#ffffff",
+    tooltipBorder: dark ? "#334155" : "#e2e8f0",
+    tooltipText: dark ? "#e2e8f0" : "#0f172a",
+    legendText: dark ? "#94a3b8" : "#64748b",
+  };
 
   if (isLoading || !overview) return <Spinner />;
 
@@ -63,9 +74,9 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-white">Overview</h1>
+      <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Overview</h1>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="nc-stagger grid grid-cols-2 gap-4 lg:grid-cols-5">
         <Stat
           label="Total articles"
           value={formatNumber(overview.total_articles)}
@@ -101,18 +112,24 @@ export default function OverviewPage() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={overview.articles_per_day}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="day" stroke="#64748b" fontSize={12} />
-                <YAxis stroke="#64748b" fontSize={12} allowDecimals={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+                <XAxis dataKey="day" stroke={chart.axis} fontSize={12} />
+                <YAxis stroke={chart.axis} fontSize={12} allowDecimals={false} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#0f172a",
-                    border: "1px solid #334155",
+                    backgroundColor: chart.tooltipBg,
+                    border: `1px solid ${chart.tooltipBorder}`,
                     borderRadius: 8,
                   }}
-                  labelStyle={{ color: "#e2e8f0" }}
+                  labelStyle={{ color: chart.tooltipText }}
+                  cursor={{ fill: dark ? "rgba(148,163,184,0.06)" : "rgba(100,116,139,0.06)" }}
                 />
-                <Bar dataKey="count" fill="#0284c7" radius={[4, 4, 0, 0]} />
+                <Bar
+                  dataKey="count"
+                  fill="#0284c7"
+                  radius={[4, 4, 0, 0]}
+                  animationDuration={600}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -137,29 +154,32 @@ export default function OverviewPage() {
                     innerRadius={48}
                     outerRadius={78}
                     paddingAngle={2}
+                    animationDuration={600}
                   >
                     {sentimentData.map((entry) => (
                       <Cell
                         key={entry.key}
                         fill={SENTIMENT_COLORS[entry.key] ?? "#64748b"}
-                        stroke="#0f172a"
+                        stroke={chart.tooltipBg}
                       />
                     ))}
                   </Pie>
                   <Tooltip
                     formatter={(value) => formatNumber(Number(value))}
                     contentStyle={{
-                      backgroundColor: "#0f172a",
-                      border: "1px solid #334155",
+                      backgroundColor: chart.tooltipBg,
+                      border: `1px solid ${chart.tooltipBorder}`,
                       borderRadius: 8,
                     }}
-                    labelStyle={{ color: "#e2e8f0" }}
+                    labelStyle={{ color: chart.tooltipText }}
                   />
                   <Legend
                     verticalAlign="bottom"
                     height={36}
                     formatter={(value) => (
-                      <span className="text-xs text-slate-400">{value}</span>
+                      <span className="text-xs" style={{ color: chart.legendText }}>
+                        {value}
+                      </span>
                     )}
                   />
                 </PieChart>
@@ -179,7 +199,9 @@ export default function OverviewPage() {
             {languages.map(([lang, count]) => (
               <div key={lang} className="flex items-center justify-between">
                 <StatusBadge status={lang} />
-                <span className="text-sm text-slate-300">{formatNumber(count)}</span>
+                <span className="text-sm text-slate-600 dark:text-slate-300">
+                  {formatNumber(count)}
+                </span>
               </div>
             ))}
           </div>
@@ -194,7 +216,9 @@ export default function OverviewPage() {
             {frontier.map(([status, count]) => (
               <div key={status} className="flex items-center justify-between">
                 <StatusBadge status={status} />
-                <span className="text-sm text-slate-300">{formatNumber(count)}</span>
+                <span className="text-sm text-slate-600 dark:text-slate-300">
+                  {formatNumber(count)}
+                </span>
               </div>
             ))}
           </div>
