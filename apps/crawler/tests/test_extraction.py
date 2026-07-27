@@ -3,9 +3,9 @@
 import re
 
 from newscrawl_crawler.extraction import extract_article
-from newscrawl_crawler.selectors.prothom_alo import PROTHOM_ALO
+from newscrawl_crawler.selectors import SelectorSet
 
-BENGALI_CHAR = re.compile(r"[\u0980-\u09ff]")
+BENGALI_CHAR = re.compile(r"[ঀ-৿]")
 
 
 class TestProthomAloContract:
@@ -14,8 +14,10 @@ class TestProthomAloContract:
     If Prothom Alo changes markup, refresh the fixture and fix selectors —
     this test failing is the early-warning signal."""
 
-    def test_jsonld_extraction(self, prothom_alo_html: str) -> None:
-        article = extract_article(prothom_alo_html, selectors=PROTHOM_ALO)
+    def test_jsonld_extraction(
+        self, prothom_alo_html: str, prothom_alo_selectors: SelectorSet
+    ) -> None:
+        article = extract_article(prothom_alo_html, selectors=prothom_alo_selectors)
         assert article.is_usable
         assert article.extraction_method == "json_ld"
         assert article.extraction_confidence >= 0.9
@@ -27,7 +29,9 @@ class TestProthomAloContract:
         assert article.category
         assert article.canonical_url and "prothomalo.com" in article.canonical_url
 
-    def test_selector_fallback_without_jsonld(self, prothom_alo_html: str) -> None:
+    def test_selector_fallback_without_jsonld(
+        self, prothom_alo_html: str, prothom_alo_selectors: SelectorSet
+    ) -> None:
         # Strip JSON-LD to force the selector path
         stripped = re.sub(
             r'<script type="application/ld\+json">.*?</script>',
@@ -35,7 +39,7 @@ class TestProthomAloContract:
             prothom_alo_html,
             flags=re.S,
         )
-        article = extract_article(stripped, selectors=PROTHOM_ALO)
+        article = extract_article(stripped, selectors=prothom_alo_selectors)
         assert article.body, "selector fallback must recover the body"
         assert BENGALI_CHAR.search(article.body)
         assert article.extraction_method == "selectors"
