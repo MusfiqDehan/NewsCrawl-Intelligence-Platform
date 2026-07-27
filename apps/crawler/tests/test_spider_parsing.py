@@ -4,12 +4,12 @@ from datetime import UTC, datetime
 from typing import Any
 
 from newscrawl_contracts.enums import UrlType
-from newscrawl_crawler.spiders.prothom_alo import ProthomAloSpider
+from newscrawl_crawler.spiders.base import NewsSpiderBase
 from scrapy.http import HtmlResponse, Request, TextResponse, XmlResponse
 
 
-def make_spider(source_config_dict: dict[str, Any]) -> ProthomAloSpider:
-    return ProthomAloSpider(source_config=source_config_dict)
+def make_spider(source_config_dict: dict[str, Any]) -> NewsSpiderBase:
+    return NewsSpiderBase(source_config=source_config_dict, name=source_config_dict["slug"])
 
 
 def xml_response(url: str, body: str) -> XmlResponse:
