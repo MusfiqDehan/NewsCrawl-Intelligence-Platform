@@ -22,13 +22,15 @@ function ArticleRow({ article }: { article: ArticleSummary }) {
   return (
     <Link
       href={`/explore/articles/${article.id}`}
-      className="block rounded-xl border border-slate-800 bg-slate-900/60 p-4 transition-colors hover:border-slate-700 hover:bg-slate-900"
+      className="block rounded-xl border border-slate-200 bg-white p-4 transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700 dark:hover:bg-slate-900"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h3 className="truncate font-medium text-white">{article.title}</h3>
+          <h3 className="truncate font-medium text-slate-900 dark:text-white">
+            {article.title}
+          </h3>
           {article.summary && (
-            <p className="mt-1 line-clamp-2 text-sm text-slate-400">
+            <p className="mt-1 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">
               {article.summary}
             </p>
           )}
@@ -73,8 +75,8 @@ export default function PublicArticlesPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold text-white">
+      <div className="nc-rise">
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900 dark:text-white">
           Browse articles
         </h1>
         <p className="mt-1 text-sm text-slate-500">
@@ -94,7 +96,7 @@ export default function PublicArticlesPage() {
           placeholder="Filter by title…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          className="w-64"
+          className="w-full sm:w-64"
         />
         <Select
           value={language}
@@ -123,7 +125,7 @@ export default function PublicArticlesPage() {
           <div className="text-sm text-slate-500">
             {formatNumber(data.total)} articles
           </div>
-          <div className="space-y-3">
+          <div className="nc-stagger space-y-3">
             {data.items.map((a) => (
               <ArticleRow key={a.id} article={a} />
             ))}
