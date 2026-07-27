@@ -110,6 +110,11 @@ services:
         "5",
       ]
     env_file: env.prod
+    volumes:
+      # Hot-deploy crawl plane without rebuilding Playwright image.
+      - ./apps/crawler/newscrawl_crawler:/app/apps/crawler/newscrawl_crawler
+      - ./packages/contracts/newscrawl_contracts:/app/packages/contracts/newscrawl_contracts:ro
+      - ./apps/api/newscrawl_api:/app/apps/api/newscrawl_api:ro
     networks:
       - internal
     depends_on:
