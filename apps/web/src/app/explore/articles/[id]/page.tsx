@@ -29,12 +29,12 @@ export default function PublicArticleDetailPage() {
     <div className="space-y-6">
       <Link
         href="/explore/articles"
-        className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white"
+        className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
       >
         <ArrowLeft className="h-4 w-4" /> Back to browse
       </Link>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="nc-fade-in grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -49,11 +49,13 @@ export default function PublicArticleDetailPage() {
                 <Badge color="purple">{article.political_category}</Badge>
               )}
             </div>
-            <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold leading-snug text-white">
+            <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold leading-snug text-slate-900 dark:text-white">
               {article.title}
             </h1>
             {article.subtitle && (
-              <p className="mt-2 text-lg text-slate-400">{article.subtitle}</p>
+              <p className="mt-2 text-lg text-slate-500 dark:text-slate-400">
+                {article.subtitle}
+              </p>
             )}
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
               {article.author && <span>{article.author}</span>}
@@ -64,7 +66,7 @@ export default function PublicArticleDetailPage() {
                 href={article.canonical_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sky-400 hover:text-sky-300"
+                className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-500 dark:text-sky-400 dark:hover:text-sky-300"
               >
                 · original <ExternalLink className="h-3 w-3" />
               </a>
@@ -74,7 +76,7 @@ export default function PublicArticleDetailPage() {
           {article.summary && (
             <Card>
               <CardTitle>Summary</CardTitle>
-              <p className="text-sm leading-relaxed text-slate-300">
+              <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
                 {article.summary}
               </p>
             </Card>
@@ -82,7 +84,7 @@ export default function PublicArticleDetailPage() {
 
           <Card>
             <CardTitle>Article</CardTitle>
-            <div className="max-h-[40rem] space-y-4 overflow-y-auto whitespace-pre-line text-sm leading-relaxed text-slate-300">
+            <div className="max-h-[40rem] space-y-4 overflow-y-auto whitespace-pre-line text-sm leading-relaxed text-slate-700 dark:text-slate-300">
               {article.body}
             </div>
           </Card>
@@ -101,7 +103,9 @@ export default function PublicArticleDetailPage() {
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between gap-2">
                   <dt className="text-slate-500">{label}</dt>
-                  <dd className="text-right text-slate-300">{value}</dd>
+                  <dd className="text-right text-slate-700 dark:text-slate-300">
+                    {value}
+                  </dd>
                 </div>
               ))}
             </dl>
@@ -130,10 +134,10 @@ export default function PublicArticleDetailPage() {
                 <Link
                   key={a.id}
                   href={`/explore/articles/${a.id}`}
-                  className="block rounded-lg border border-slate-800 p-3 transition-colors hover:border-slate-700"
+                  className="block rounded-lg border border-slate-200 p-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:hover:border-slate-700"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="line-clamp-2 text-sm text-slate-300">
+                    <span className="line-clamp-2 text-sm text-slate-700 dark:text-slate-300">
                       {a.title}
                     </span>
                     <Badge color="blue">{(similarity * 100).toFixed(0)}%</Badge>
