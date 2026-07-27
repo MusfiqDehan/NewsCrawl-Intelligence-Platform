@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { Button, Card, ErrorState, Input } from "@/components/ui";
 import { Logo } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { api, getToken, setSession } from "@/lib/api";
 import type { TokenResponse } from "@/lib/types";
 
@@ -40,17 +41,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 dark:bg-transparent">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(14,165,233,0.18),_transparent_55%),linear-gradient(180deg,#020617_0%,#0f172a_100%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(2,132,199,0.12),_transparent_55%)] dark:bg-[radial-gradient(ellipse_at_top,_rgba(14,165,233,0.18),_transparent_55%),linear-gradient(180deg,#020617_0%,#0f172a_100%)]"
       />
-      <Card className="relative z-10 w-full max-w-sm">
+      <div className="absolute right-4 top-4 z-20">
+        <ThemeToggle />
+      </div>
+      <Card className="nc-scale-in relative z-10 w-full max-w-sm">
         <div className="mb-6 text-center">
           <Link href="/" className="mx-auto mb-3 inline-flex">
             <Logo className="h-12 w-12" />
           </Link>
-          <h1 className="font-[family-name:var(--font-display)] text-lg font-semibold text-white">
+          <h1 className="font-[family-name:var(--font-display)] text-lg font-semibold text-slate-900 dark:text-white">
             NewsCrawl
           </h1>
           <p className="text-sm text-slate-500">Sign in to the operations dashboard</p>
@@ -78,7 +82,10 @@ export default function LoginPage() {
           </Button>
         </form>
         <p className="mt-4 text-center text-xs text-slate-500">
-          <Link href="/" className="text-sky-400 hover:text-sky-300">
+          <Link
+            href="/"
+            className="text-sky-600 hover:text-sky-500 dark:text-sky-400 dark:hover:text-sky-300"
+          >
             ← Back to home
           </Link>
         </p>
