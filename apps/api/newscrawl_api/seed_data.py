@@ -35,6 +35,37 @@ SOURCES: list[dict[str, Any]] = [
         "requires_browser": False,
         "extraction_strategy": "selectors",
         "source_weight": 1.0,
+        "selectors": {
+            "title": [
+                "h1.IiRps::text",
+                "h1[class*=headline]::text",
+                "h1::text",
+            ],
+            "author": [
+                ".contributor-name::text",
+                ".author-name::text",
+                "span[class*=author] a::text",
+            ],
+            "published_at": [
+                "time::attr(datetime)",
+                ".storyPageMetaData-m__publish-time__19bdV time::attr(datetime)",
+            ],
+            "category": [
+                ".breadcrumb a::text",
+                "a[class*=section-name]::text",
+            ],
+            "body": [
+                "div.story-element-text p",
+                "div.story-element-text",
+                "div[class*=story-content] p",
+            ],
+            "images": [
+                "div.story-element-image img::attr(src)",
+                "figure img::attr(src)",
+            ],
+            "tags": [".tags a::text", "a[class*=tag]::text"],
+            "body_probe": "div.story-element-text",
+        },
     },
     {
         "name": "Kaler Kantho",
@@ -63,6 +94,24 @@ SOURCES: list[dict[str, Any]] = [
         "requires_browser": True,
         "extraction_strategy": "selectors",
         "source_weight": 1.0,
+        "selectors": {
+            "title": ["h1::text"],
+            "author": [
+                "[class*=author] a::text",
+                "[class*=author]::text",
+                "[class*=reporter]::text",
+            ],
+            "published_at": ["time::attr(datetime)"],
+            "category": [".breadcrumb a::text", "nav[class*=breadcrumb] a::text"],
+            "body": [
+                "article p",
+                "div[class*=details] p",
+                "main p",
+            ],
+            "images": ["article figure img::attr(src)", "article img::attr(src)"],
+            "tags": ["[class*=tag] a::text"],
+            "body_probe": "article p",
+        },
     },
     {
         "name": "Naya Diganta",
@@ -92,6 +141,29 @@ SOURCES: list[dict[str, Any]] = [
         "requires_browser": False,
         "extraction_strategy": "selectors",
         "source_weight": 0.8,
+        "selectors": {
+            "title": ["h1.post-title::text", "h1::text"],
+            "author": [
+                ".post-reporters a::text",
+                ".post-reporters h5::text",
+                ".post_sources h5 a::text",
+            ],
+            "published_at": [
+                ".post-publish-date time::attr(title)",
+                "time::attr(title)",
+            ],
+            "category": [".breadcrumb a::text"],
+            "body": [
+                "div.post-body .richtext p",
+                "div.post-body p",
+            ],
+            "images": [
+                ".post-featured-image img::attr(src)",
+                "figure img::attr(src)",
+            ],
+            "tags": [],
+            "body_probe": "div.post-body",
+        },
     },
     {
         "name": "BBC News",
@@ -122,6 +194,23 @@ SOURCES: list[dict[str, Any]] = [
         "requires_browser": False,
         "extraction_strategy": "selectors",
         "source_weight": 1.2,
+        "selectors": {
+            "title": ["h1::text"],
+            "author": [
+                '[data-testid="byline-name"]::text',
+                "[class*=byline] [class*=name]::text",
+            ],
+            "published_at": ["time::attr(datetime)"],
+            "category": ['[data-testid="navigation-link"] span::text'],
+            "body": [
+                'article [data-component="text-block"] p',
+                "article p",
+                "main p",
+            ],
+            "images": ["article figure img::attr(src)"],
+            "tags": ['[data-testid="topic-list"] a::text'],
+            "body_probe": 'article [data-component="text-block"]',
+        },
     },
     {
         "name": "BBC Bangla",
@@ -143,6 +232,22 @@ SOURCES: list[dict[str, Any]] = [
         "requires_browser": False,
         "extraction_strategy": "selectors",
         "source_weight": 1.1,
+        "selectors": {
+            "title": ["h1::text"],
+            "author": [
+                '[data-testid="byline-name"]::text',
+                "[class*=byline] [class*=name]::text",
+            ],
+            "published_at": ["time::attr(datetime)"],
+            "body": [
+                # [dir] scoping skips image captions and promo blocks
+                "main [dir] p",
+                "main p",
+            ],
+            "images": ["main figure img::attr(src)"],
+            "tags": ['[data-testid="topic-list"] a::text'],
+            "body_probe": "main [dir] p",
+        },
     },
     {
         "name": "Al Jazeera",
@@ -171,6 +276,26 @@ SOURCES: list[dict[str, Any]] = [
         # frontier URLs both deduplicated and robots-compliant
         "url_normalization": {
             "extra_tracking_params": ["traffic_source", "gb", "playlist"],
+        },
+        "selectors": {
+            "title": ["h1::text", "header h1 span::text"],
+            "subtitle": ["p.article__subhead::text", "em.article__subhead::text"],
+            "author": [
+                ".article-author-name-item a::text",
+                ".article-author-name-item::text",
+                "[class*=author] a::text",
+            ],
+            "published_at": [
+                ".article-dates .date-simple span[aria-hidden]::text",
+                "time::attr(datetime)",
+            ],
+            "body": [
+                "div.wysiwyg p",
+                "main .wysiwyg p",
+            ],
+            "images": ["main figure img::attr(src)"],
+            "tags": [".article-tags a::text"],
+            "body_probe": "div.wysiwyg",
         },
     },
 ]
