@@ -87,7 +87,7 @@ export function Brand({
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <Logo className={logoClassName} />
       <span className="min-w-0 leading-tight">
-        <span className="block font-[family-name:var(--font-display)] text-sm font-bold tracking-tight text-white">
+        <span className="block font-[family-name:var(--font-display)] text-sm font-bold tracking-tight text-slate-900 dark:text-white">
           NewsCrawl
         </span>
         {showTagline && (
