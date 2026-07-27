@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Hind_Siliguri, Manrope, Syne } from "next/font/google";
 
 import { Providers } from "@/components/providers";
+import { ThemeProvider, themeInitScript } from "@/lib/theme";
 
 import "./globals.css";
 
@@ -37,11 +38,17 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body
         className={`${hind.variable} ${sans.variable} ${display.variable} antialiased`}
+        suppressHydrationWarning
       >
-        <Providers>{children}</Providers>
+        <ThemeProvider>
+          <Providers>{children}</Providers>
+        </ThemeProvider>
       </body>
     </html>
   );
