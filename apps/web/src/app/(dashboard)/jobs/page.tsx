@@ -15,6 +15,7 @@ import {
   Table,
   Td,
   Th,
+  Tr,
 } from "@/components/ui";
 import { useCreateJob, useJobAction, useJobs, useSources } from "@/lib/hooks";
 import type { CrawlJob } from "@/lib/types";
@@ -35,7 +36,7 @@ function CreateJobForm({ onClose }: { onClose: () => void }) {
   const [jobType, setJobType] = useState("incremental_crawl");
 
   return (
-    <Card className="mb-4">
+    <Card className="nc-scale-in mb-4">
       <form
         className="flex flex-wrap items-end gap-3"
         onSubmit={async (e) => {
@@ -115,9 +116,11 @@ export default function JobsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-white">Crawl Jobs</h1>
-        <div className="flex gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="nc-rise text-xl font-semibold text-slate-900 dark:text-white">
+          Crawl Jobs
+        </h1>
+        <div className="flex flex-wrap gap-3">
           <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">All statuses</option>
             {["queued", "running", "paused", "completed", "failed", "cancelled"].map(
@@ -140,46 +143,50 @@ export default function JobsPage() {
 
       {data && data.items.length === 0 && <EmptyState message="No crawl jobs found" />}
       {data && data.items.length > 0 && (
-        <Table>
-          <thead>
-            <tr>
-              <Th>Source</Th>
-              <Th>Type</Th>
-              <Th>Status</Th>
-              <Th className="text-right">Discovered</Th>
-              <Th className="text-right">Success</Th>
-              <Th className="text-right">Failed</Th>
-              <Th className="text-right">Changed</Th>
-              <Th>Created</Th>
-              <Th>Actions</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.items.map((job) => (
-              <tr key={job.id} className="hover:bg-slate-900/50">
-                <Td className="font-medium text-white">{sourceName(job.source_id)}</Td>
-                <Td className="text-slate-400">{job.job_type}</Td>
-                <Td>
-                  <StatusBadge status={job.status} />
-                </Td>
-                <Td className="text-right">{formatNumber(job.pages_discovered)}</Td>
-                <Td className="text-right text-emerald-400">
-                  {formatNumber(job.pages_successful)}
-                </Td>
-                <Td className="text-right text-rose-400">
-                  {formatNumber(job.pages_failed)}
-                </Td>
-                <Td className="text-right">{formatNumber(job.pages_changed)}</Td>
-                <Td className="text-slate-500">
-                  {formatDistanceToNow(new Date(job.created_at), { addSuffix: true })}
-                </Td>
-                <Td>
-                  <JobActions job={job} />
-                </Td>
+        <div className="nc-fade-in">
+          <Table>
+            <thead>
+              <tr>
+                <Th>Source</Th>
+                <Th>Type</Th>
+                <Th>Status</Th>
+                <Th className="text-right">Discovered</Th>
+                <Th className="text-right">Success</Th>
+                <Th className="text-right">Failed</Th>
+                <Th className="text-right">Changed</Th>
+                <Th>Created</Th>
+                <Th>Actions</Th>
               </tr>
-            ))}
-          </tbody>
-        </Table>
+            </thead>
+            <tbody>
+              {data.items.map((job) => (
+                <Tr key={job.id}>
+                  <Td className="font-medium text-slate-900 dark:text-white">
+                    {sourceName(job.source_id)}
+                  </Td>
+                  <Td className="text-slate-500 dark:text-slate-400">{job.job_type}</Td>
+                  <Td>
+                    <StatusBadge status={job.status} />
+                  </Td>
+                  <Td className="text-right">{formatNumber(job.pages_discovered)}</Td>
+                  <Td className="text-right text-emerald-400">
+                    {formatNumber(job.pages_successful)}
+                  </Td>
+                  <Td className="text-right text-rose-400">
+                    {formatNumber(job.pages_failed)}
+                  </Td>
+                  <Td className="text-right">{formatNumber(job.pages_changed)}</Td>
+                  <Td className="text-slate-500">
+                    {formatDistanceToNow(new Date(job.created_at), { addSuffix: true })}
+                  </Td>
+                  <Td>
+                    <JobActions job={job} />
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
       )}
     </div>
   );
