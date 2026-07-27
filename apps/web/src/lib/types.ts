@@ -13,17 +13,53 @@ export interface User {
   created_at: string;
 }
 
+export interface SelectorSet {
+  title: string[];
+  subtitle: string[];
+  author: string[];
+  published_at: string[];
+  category: string[];
+  body: string[];
+  images: string[];
+  tags: string[];
+  body_probe: string | null;
+}
+
 export interface Source {
   id: string;
   name: string;
   slug: string;
   base_url: string;
   language: string;
+  country: string;
   enabled: boolean;
   crawl_enabled: boolean;
-  requires_browser: boolean;
+  allowed_domains: string[];
+  article_url_patterns: string[];
+  section_urls: string[];
+  sitemap_urls: string[];
+  rss_urls: string[];
   crawl_frequency_minutes: number;
+  rate_limit_delay_seconds: number;
+  max_concurrency: number;
+  requires_browser: boolean;
+  extraction_strategy: string;
+  robots_policy: string;
+  source_weight: number;
+  url_normalization: Record<string, unknown>;
+  selectors: SelectorSet | null;
 }
+
+/** POST /sources payload — mirrors the backend's SourceCreate schema. */
+export type SourceCreatePayload = Omit<
+  Source,
+  "id" | "url_normalization"
+> & {
+  url_normalization?: Record<string, unknown>;
+};
+
+/** PATCH /sources/{id} payload — every field optional. */
+export type SourceUpdatePayload = Partial<SourceCreatePayload>;
 
 export type CrawlJobStatus =
   | "created"
