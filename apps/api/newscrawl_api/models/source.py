@@ -41,6 +41,11 @@ class Source(Base, TimestampMixin):
     # Per-source URL normalization overrides (tracking params, kept params, ...)
     url_normalization: Mapped[dict[str, Any]] = mapped_column(default=dict)
 
+    # Extraction rules (CSS selector set). NULL means "never explicitly set" —
+    # distinct from an operator saving an empty payload — so the seed script
+    # can backfill legacy rows without ever overwriting an operator's edit.
+    selectors: Mapped[dict[str, Any] | None] = mapped_column(default=None)
+
     # Health
     last_successful_crawl_at: Mapped[datetime | None] = mapped_column(default=None)
     last_error: Mapped[str | None] = mapped_column(Text, default=None)
