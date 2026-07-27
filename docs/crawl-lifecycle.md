@@ -71,3 +71,33 @@ queued   ─► skipped                                         (filtered before
    `processing:cleaning`.
 4. The processing plane takes over — see
    [deduplication.md](deduplication.md) and the processor docs.
+
+## Onboarding a new source
+
+Every source is one row in the `sources` table, created/edited via
+`POST`/`PATCH /api/v1/sources` (admin-only) or the dashboard's Sources page —
+no code change or deploy is required. There is a single generic spider
+(`NewsSpiderBase`) shared by every source; it is fully parameterized by the
+`SourceConfig` snapshot the crawl worker loads per pass.
+
+Fields that matter for onboarding:
+
+- **Discovery**: `allowed_domains`, `article_url_patterns` (regexes matched
+  against normalized URLs), `section_urls`, `sitemap_urls`, `rss_urls` — at
+  least one discovery entry point is needed or nothing gets queued.
+- **Crawl behavior**: `crawl_frequency_minutes`, `rate_limit_delay_seconds`,
+  `max_concurrency`, `robots_policy`, `source_weight` (priority tiebreaker).
+- **`requires_browser`**: set when a source blocks plain HTTP fetches (e.g. a
+  Cloudflare JS challenge). Independently, any page whose extraction comes
+  back unusable is retried once via Playwright regardless of this flag.
+- **`selectors`**: the CSS extraction rules — `title`, `subtitle`, `author`,
+  `published_at`, `category`, `body`, `images`, `tags` (each a list of
+  selectors tried in order) and `body_probe` (a selector that must match for
+  a page to count as "fully rendered," used by the browser-retry heuristic).
+  JSON-LD (`NewsArticle` schema.org metadata) is tried first when present;
+  `selectors` is the fallback/primary extraction path otherwise. Leaving
+  `selectors` unset falls back to generic heuristics (`h1::text`,
+  `article p`, …) rather than extracting nothing.
+
+A source with `enabled=true` and `crawl_enabled=true` is picked up by the
+next crawl worker pass automatically.
