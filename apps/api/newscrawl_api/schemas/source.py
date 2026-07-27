@@ -5,6 +5,22 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 
+class SelectorSetSchema(BaseModel):
+    """CSS extraction rules for a source. Fields mirror the crawler's
+    ``SelectorSet`` dataclass so a payload here round-trips unchanged into the
+    ``SourceConfig`` snapshot the crawl worker receives."""
+
+    title: list[str] = Field(default_factory=lambda: ["h1::text"])
+    subtitle: list[str] = Field(default_factory=list)
+    author: list[str] = Field(default_factory=list)
+    published_at: list[str] = Field(default_factory=lambda: ["time::attr(datetime)"])
+    category: list[str] = Field(default_factory=list)
+    body: list[str] = Field(default_factory=lambda: ["article p"])
+    images: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    body_probe: str | None = None
+
+
 class SourceBase(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     slug: str = Field(min_length=1, max_length=100, pattern=r"^[a-z0-9-]+$")
@@ -26,6 +42,7 @@ class SourceBase(BaseModel):
     robots_policy: str = "obey"
     source_weight: float = Field(default=1.0, ge=0)
     url_normalization: dict[str, Any] = Field(default_factory=dict)
+    selectors: SelectorSetSchema | None = None
 
     @field_validator("base_url")
     @classmethod
@@ -63,6 +80,7 @@ class SourceUpdate(BaseModel):
     robots_policy: str | None = None
     source_weight: float | None = Field(default=None, ge=0)
     url_normalization: dict[str, Any] | None = None
+    selectors: SelectorSetSchema | None = None
 
 
 class SourceResponse(SourceBase):
