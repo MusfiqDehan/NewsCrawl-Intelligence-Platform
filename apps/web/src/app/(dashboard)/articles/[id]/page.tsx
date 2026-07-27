@@ -29,12 +29,12 @@ export default function ArticleDetailPage() {
     <div className="space-y-6">
       <Link
         href="/articles"
-        className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white"
+        className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
       >
         <ArrowLeft className="h-4 w-4" /> Back to articles
       </Link>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="nc-fade-in grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -46,11 +46,13 @@ export default function ArticleDetailPage() {
               )}
               {article.duplicate_of && <Badge color="red">duplicate</Badge>}
             </div>
-            <h1 className="text-2xl font-semibold leading-snug text-white">
+            <h1 className="text-2xl font-semibold leading-snug text-slate-900 dark:text-white">
               {article.title}
             </h1>
             {article.subtitle && (
-              <p className="mt-2 text-lg text-slate-400">{article.subtitle}</p>
+              <p className="mt-2 text-lg text-slate-500 dark:text-slate-400">
+                {article.subtitle}
+              </p>
             )}
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
               {article.author && <span>{article.author}</span>}
@@ -71,13 +73,15 @@ export default function ArticleDetailPage() {
           {article.summary && (
             <Card>
               <CardTitle>LLM Summary</CardTitle>
-              <p className="text-sm leading-relaxed text-slate-300">{article.summary}</p>
+              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                {article.summary}
+              </p>
             </Card>
           )}
 
           <Card>
             <CardTitle>Body</CardTitle>
-            <div className="max-h-[32rem] space-y-4 overflow-y-auto whitespace-pre-line text-sm leading-relaxed text-slate-300">
+            <div className="max-h-[32rem] space-y-4 overflow-y-auto whitespace-pre-line text-sm leading-relaxed text-slate-600 dark:text-slate-300">
               {article.body}
             </div>
           </Card>
@@ -96,7 +100,7 @@ export default function ArticleDetailPage() {
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between gap-2">
                   <dt className="text-slate-500">{label}</dt>
-                  <dd className="text-right text-slate-300">{value}</dd>
+                  <dd className="text-right text-slate-600 dark:text-slate-300">{value}</dd>
                 </div>
               ))}
             </dl>
@@ -120,15 +124,17 @@ export default function ArticleDetailPage() {
             {similar.data && similar.data.length === 0 && (
               <p className="text-sm text-slate-500">No similar articles</p>
             )}
-            <div className="space-y-3">
+            <div className="nc-stagger space-y-3">
               {similar.data?.map(({ article: a, similarity }) => (
                 <Link
                   key={a.id}
                   href={`/articles/${a.id}`}
-                  className="block rounded-lg border border-slate-800 p-3 transition-colors hover:border-slate-700"
+                  className="block rounded-lg border border-slate-200 p-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:hover:border-slate-700"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="line-clamp-2 text-sm text-slate-300">{a.title}</span>
+                    <span className="line-clamp-2 text-sm text-slate-600 dark:text-slate-300">
+                      {a.title}
+                    </span>
                     <Badge color="blue">{(similarity * 100).toFixed(0)}%</Badge>
                   </div>
                 </Link>
