@@ -1,11 +1,13 @@
 """Per-source CSS selector sets.
 
-Each source registers one SelectorSet. Selectors are tuples tried in order —
-when a site tweaks its markup only its own module changes, and the fixture
-contract tests for that source catch the break immediately.
+Selector sets are DB-driven — an operator sets them on the `sources` row
+(via the admin API) and they arrive here as part of the `SourceConfig`
+snapshot passed to each spider. Selectors are tuples tried in order.
 """
 
 from dataclasses import dataclass
+
+from newscrawl_contracts import SelectorSetConfig
 
 
 @dataclass(frozen=True)
@@ -24,12 +26,22 @@ class SelectorSet:
     body_probe: str | None = None
 
 
-_REGISTRY: dict[str, SelectorSet] = {}
+def build_selector_set(config: SelectorSetConfig | None) -> SelectorSet:
+    """Convert a source's DB-provided selector config into a SelectorSet.
 
-
-def register(slug: str, selectors: SelectorSet) -> None:
-    _REGISTRY[slug] = selectors
-
-
-def get_selector_set(slug: str) -> SelectorSet:
-    return _REGISTRY.get(slug, SelectorSet())
+    None means the source has never had selectors configured — falls back to
+    the generic defaults above rather than extracting nothing.
+    """
+    if config is None:
+        return SelectorSet()
+    return SelectorSet(
+        title=tuple(config.title),
+        subtitle=tuple(config.subtitle),
+        author=tuple(config.author),
+        published_at=tuple(config.published_at),
+        category=tuple(config.category),
+        body=tuple(config.body),
+        images=tuple(config.images),
+        tags=tuple(config.tags),
+        body_probe=config.body_probe,
+    )
