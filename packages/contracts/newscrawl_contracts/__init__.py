@@ -5,7 +5,7 @@ from newscrawl_contracts.messages import (
     QueueMessage,
     RawPageMessage,
 )
-from newscrawl_contracts.source_config import SourceConfig
+from newscrawl_contracts.source_config import SelectorSetConfig, SourceConfig
 
 __all__ = [
     "DeadLetterMessage",
@@ -13,5 +13,6 @@ __all__ = [
     "LlmExtractionMessage",
     "QueueMessage",
     "RawPageMessage",
+    "SelectorSetConfig",
     "SourceConfig",
 ]
