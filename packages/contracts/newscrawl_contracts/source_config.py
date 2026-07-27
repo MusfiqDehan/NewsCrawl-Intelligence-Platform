@@ -11,6 +11,24 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class SelectorSetConfig(BaseModel):
+    """CSS extraction rules for a source, snapshotted alongside the rest of
+    ``SourceConfig`` so a mid-crawl config change can't produce a half-old/
+    half-new extraction."""
+
+    model_config = ConfigDict(frozen=True)
+
+    title: list[str] = Field(default_factory=lambda: ["h1::text"])
+    subtitle: list[str] = Field(default_factory=list)
+    author: list[str] = Field(default_factory=list)
+    published_at: list[str] = Field(default_factory=lambda: ["time::attr(datetime)"])
+    category: list[str] = Field(default_factory=list)
+    body: list[str] = Field(default_factory=lambda: ["article p"])
+    images: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    body_probe: str | None = None
+
+
 class SourceConfig(BaseModel):
     model_config = ConfigDict(frozen=True, from_attributes=True)
 
@@ -33,3 +51,4 @@ class SourceConfig(BaseModel):
     robots_policy: str = "obey"
     source_weight: float = 1.0
     url_normalization: dict[str, Any] = Field(default_factory=dict)
+    selectors: SelectorSetConfig | None = None
