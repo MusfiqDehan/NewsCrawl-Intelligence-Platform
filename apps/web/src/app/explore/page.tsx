@@ -2,7 +2,7 @@
 
 import { SearchIcon } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import {
   Badge,
@@ -22,22 +22,28 @@ export default function PublicSearchPage() {
   const [query, setQuery] = useState("");
   const [language, setLanguage] = useState("");
   const [languageTouched, setLanguageTouched] = useState(false);
+  const [detectedInput, setDetectedInput] = useState(input);
 
   const { data, isFetching, error } = usePublicSemanticSearch(
     query,
     language || undefined,
   );
 
-  useEffect(() => {
-    if (languageTouched) return;
-    const detected = detectQueryLanguage(input);
-    if (detected) setLanguage(detected);
-  }, [input, languageTouched]);
+  // Adjust `language` in response to `input` changing — done during render (React's
+  // sanctioned pattern for this) rather than in an effect, since it only needs to
+  // re-run when input itself changes, not as a reaction requiring a commit.
+  if (input !== detectedInput) {
+    setDetectedInput(input);
+    if (!languageTouched) {
+      const detected = detectQueryLanguage(input);
+      if (detected) setLanguage(detected);
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold text-white">
+      <div className="nc-rise">
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900 dark:text-white">
           Semantic Search
         </h1>
         <p className="mt-1 text-sm text-slate-500">
@@ -87,18 +93,20 @@ export default function PublicSearchPage() {
       )}
 
       {data && !isFetching && data.results.length > 0 && (
-        <div className="space-y-3">
+        <div className="nc-stagger space-y-3">
           {data.results.map(({ article, similarity }) => (
             <Link
               key={article.id}
               href={`/explore/articles/${article.id}`}
-              className="block rounded-xl border border-slate-800 bg-slate-900/60 p-4 transition-colors hover:border-slate-700 hover:bg-slate-900"
+              className="block rounded-xl border border-slate-200 bg-white p-4 transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700 dark:hover:bg-slate-900"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <h3 className="font-medium text-white">{article.title}</h3>
+                  <h3 className="font-medium text-slate-900 dark:text-white">
+                    {article.title}
+                  </h3>
                   {article.summary && (
-                    <p className="mt-1 line-clamp-2 text-sm text-slate-400">
+                    <p className="mt-1 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">
                       {article.summary}
                     </p>
                   )}
