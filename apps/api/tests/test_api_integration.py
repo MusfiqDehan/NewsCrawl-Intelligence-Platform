@@ -70,11 +70,15 @@ async def test_sources_crud_flow(client: httpx.AsyncClient, admin_token: str) ->
 
     listing = await client.get("/api/v1/sources", headers=headers)
     assert listing.status_code == 200
-    slugs = {source["slug"] for source in listing.json()}
-    assert "prothom-alo" in slugs
+    by_slug = {source["slug"]: source for source in listing.json()}
+    assert "prothom-alo" in by_slug
+    # Seeded via seed_data.py + seed.py's backfill — must be non-NULL for the
+    # crawler to extract anything (see build_selector_set fallback).
+    assert by_slug["prothom-alo"]["selectors"] is not None
 
-    # Create a scratch source, patch it, verify persistence
+    # Create a scratch source (with a selectors payload), patch it, verify persistence
     slug = f"test-src-{uuid.uuid4().hex[:8]}"
+    selectors = {"title": ["h1.headline::text"], "body": ["div.article-body p"]}
     created = await client.post(
         "/api/v1/sources",
         headers=headers,
@@ -84,19 +88,27 @@ async def test_sources_crud_flow(client: httpx.AsyncClient, admin_token: str) ->
             "base_url": "https://test.example.com",
             "language": "en",
             "country": "US",
+            "selectors": selectors,
         },
     )
     assert created.status_code == 201, created.text
     source_id = created.json()["id"]
+    assert created.json()["selectors"]["title"] == ["h1.headline::text"]
+    assert created.json()["selectors"]["body"] == ["div.article-body p"]
 
     patched = await client.patch(
         f"/api/v1/sources/{source_id}",
         headers=headers,
-        json={"crawl_enabled": False, "rate_limit_delay_seconds": 5.0},
+        json={
+            "crawl_enabled": False,
+            "rate_limit_delay_seconds": 5.0,
+            "selectors": {"title": ["h1::text"], "body": ["article p"]},
+        },
     )
     assert patched.status_code == 200
     assert patched.json()["crawl_enabled"] is False
     assert patched.json()["rate_limit_delay_seconds"] == 5.0
+    assert patched.json()["selectors"]["title"] == ["h1::text"]
 
     duplicate = await client.post(
         "/api/v1/sources",
