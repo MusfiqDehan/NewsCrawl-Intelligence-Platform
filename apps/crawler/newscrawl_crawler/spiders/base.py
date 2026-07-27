@@ -44,15 +44,13 @@ from twisted.python.failure import Failure
 from newscrawl_crawler.browser import browser_request_meta
 from newscrawl_crawler.extraction import extract_article
 from newscrawl_crawler.items import DiscoveredLink, PageItem
-from newscrawl_crawler.selectors import get_selector_set
+from newscrawl_crawler.selectors import build_selector_set
 
 # How many recent child sitemaps of a sitemap index to follow per pass.
 SITEMAP_INDEX_LIMIT = 3
 
 
 class NewsSpiderBase(scrapy.Spider):
-    source_slug: str = ""
-
     def __init__(
         self,
         *args: Any,
@@ -74,7 +72,7 @@ class NewsSpiderBase(scrapy.Spider):
         self._pages_claimed = 0
         self.worker_id = f"spider-{self.source.slug}-{id(self)}"
         self.frontier = Frontier()
-        self.selectors = get_selector_set(self.source.slug)
+        self.selectors = build_selector_set(self.source.selectors)
         self.article_patterns = [re.compile(p) for p in self.source.article_url_patterns]
         self.norm_config = NormalizationConfig.from_dict(self.source.url_normalization)
         self.allowed_domains = list(self.source.allowed_domains)
