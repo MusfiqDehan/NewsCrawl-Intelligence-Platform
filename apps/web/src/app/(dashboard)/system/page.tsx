@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, Card, CardTitle, EmptyState, Spinner, Table, Td, Th } from "@/components/ui";
+import { Badge, Card, CardTitle, EmptyState, Spinner, Table, Td, Th, Tr } from "@/components/ui";
 import { useQueues, useWorkers } from "@/lib/hooks";
 import { formatNumber } from "@/lib/utils";
 
@@ -16,16 +16,18 @@ export default function SystemPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-white">System Operations</h1>
+      <h1 className="nc-rise text-xl font-semibold text-slate-900 dark:text-white">
+        System Operations
+      </h1>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="nc-stagger grid gap-4 lg:grid-cols-3">
         {queues.data &&
           Object.entries(queues.data.streams).map(([stream, depth]) => (
-            <Card key={stream}>
+            <Card key={stream} interactive>
               <div className="text-sm text-slate-500">
                 {STREAM_LABELS[stream] ?? stream}
               </div>
-              <div className="mt-1 text-2xl font-semibold text-white">
+              <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">
                 {formatNumber(depth)}
               </div>
               <div className="mt-1 text-xs text-slate-500">messages pending</div>
@@ -40,13 +42,13 @@ export default function SystemPage() {
           {queues.data && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-400">Delayed (retry) jobs</span>
+                <span className="text-sm text-slate-500 dark:text-slate-400">Delayed (retry) jobs</span>
                 <Badge color={queues.data.delayed > 0 ? "yellow" : "gray"}>
                   {formatNumber(queues.data.delayed)}
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-400">Dead-lettered messages</span>
+                <span className="text-sm text-slate-500 dark:text-slate-400">Dead-lettered messages</span>
                 <Badge color={queues.data.dead_letter > 0 ? "red" : "gray"}>
                   {formatNumber(queues.data.dead_letter)}
                 </Badge>
@@ -62,7 +64,7 @@ export default function SystemPage() {
             <EmptyState message="No workers registered" />
           )}
           {workers.data && workers.data.length > 0 && (
-            <div className="text-sm text-slate-400">
+            <div className="text-sm text-slate-500 dark:text-slate-400">
               {workers.data.filter((w) => w.alive).length} of {workers.data.length} alive
             </div>
           )}
@@ -84,8 +86,8 @@ export default function SystemPage() {
           </thead>
           <tbody>
             {workers.data.map((w) => (
-              <tr key={w.worker_id} className="hover:bg-slate-900/50">
-                <Td className="font-mono text-xs text-white">{w.worker_id}</Td>
+              <Tr key={w.worker_id}>
+                <Td className="font-mono text-xs text-slate-900 dark:text-white">{w.worker_id}</Td>
                 <Td>{w.worker_type}</Td>
                 <Td>{w.status}</Td>
                 <Td className="text-slate-500">{w.hostname}</Td>
@@ -96,7 +98,7 @@ export default function SystemPage() {
                     {w.alive ? "alive" : "stale"}
                   </Badge>
                 </Td>
-              </tr>
+              </Tr>
             ))}
           </tbody>
         </Table>
