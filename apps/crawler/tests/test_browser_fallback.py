@@ -8,7 +8,7 @@ import scrapy
 from newscrawl_contracts.enums import UrlType
 from newscrawl_crawler.browser import browser_request_meta, should_abort_request
 from newscrawl_crawler.items import PageItem
-from newscrawl_crawler.spiders.prothom_alo import ProthomAloSpider
+from newscrawl_crawler.spiders.base import NewsSpiderBase
 from scrapy.http import HtmlResponse, Request
 
 
@@ -67,11 +67,15 @@ async def collect(agen: Any) -> list[Any]:
     return [x async for x in agen]
 
 
+def make_spider(source_config_dict: dict[str, Any]) -> NewsSpiderBase:
+    return NewsSpiderBase(source_config=source_config_dict, name=source_config_dict["slug"])
+
+
 class TestRuntimeDetection:
     async def test_unusable_http_article_is_retried_via_browser(
         self, source_config_dict: dict[str, Any]
     ) -> None:
-        spider = ProthomAloSpider(source_config=source_config_dict)
+        spider = make_spider(source_config_dict)
         results = await collect(spider.parse_page(article_response()))
         assert len(results) == 1
         retry = results[0]
@@ -83,7 +87,7 @@ class TestRuntimeDetection:
     async def test_browser_retry_happens_only_once(
         self, source_config_dict: dict[str, Any]
     ) -> None:
-        spider = ProthomAloSpider(source_config=source_config_dict)
+        spider = make_spider(source_config_dict)
         response = article_response({"playwright": True, "browser_retry": True})
         results = await collect(spider.parse_page(response))
         assert len(results) == 1
@@ -97,7 +101,7 @@ class TestRuntimeDetection:
     async def test_usable_http_article_is_not_retried(
         self, source_config_dict: dict[str, Any], prothom_alo_html: str
     ) -> None:
-        spider = ProthomAloSpider(source_config=source_config_dict)
+        spider = make_spider(source_config_dict)
         url = "https://www.prothomalo.com/bangladesh/abcd1234xy"
         request = Request(
             url,
@@ -123,7 +127,7 @@ class TestBrowserFailureClassification:
         from twisted.python.failure import Failure
 
         failure = Failure(PlaywrightTimeout("Timeout 45000ms exceeded."))  # type: ignore[no-untyped-call]
-        category, message = ProthomAloSpider._classify_failure(failure)
+        category, message = NewsSpiderBase._classify_failure(failure)
         assert category == FailureCategory.BROWSER_FAILURE
         assert "playwright" in message
 
@@ -141,9 +145,7 @@ class TestRequiresBrowserRouting:
             "article_url_patterns": [r"^https://www\.kalerkantho\.com/.+"],
             "requires_browser": True,
         }
-        from newscrawl_crawler.spiders.kaler_kantho import KalerKanthoSpider
-
-        return KalerKanthoSpider(source_config=config)
+        return NewsSpiderBase(source_config=config, name="kaler-kantho")
 
     def test_browser_source_pages_route_through_playwright(self) -> None:
         spider = self._kaler_kantho_spider()
@@ -158,5 +160,5 @@ class TestRequiresBrowserRouting:
     def test_plain_http_source_never_routes_through_browser(
         self, source_config_dict: dict[str, Any]
     ) -> None:
-        spider = ProthomAloSpider(source_config=source_config_dict)
+        spider = make_spider(source_config_dict)
         assert not spider._needs_browser(UrlType.ARTICLE)
