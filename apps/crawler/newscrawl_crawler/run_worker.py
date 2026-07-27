@@ -187,7 +187,7 @@ async def orchestrate(args: argparse.Namespace) -> None:
     from scrapy.utils.project import get_project_settings
     from twisted.internet import reactor
 
-    from newscrawl_crawler.registry import spider_for
+    from newscrawl_crawler.spiders.base import NewsSpiderBase
 
     log = get_logger("crawl_worker")
     loop = asyncio.get_running_loop()
@@ -213,13 +213,7 @@ async def orchestrate(args: argparse.Namespace) -> None:
 
     control = ControlListener(redis, on_control)
 
-    async def run_spider_pass(source: Any, crawl_job_id: str | None) -> bool:
-        try:
-            spider_cls = spider_for(source.slug)
-        except KeyError:
-            log.warning("no_spider_for_source", slug=source.slug)
-            return False
-
+    async def run_spider_pass(source: Any, crawl_job_id: str | None) -> None:
         settings = get_project_settings().copy()
         settings.set("DOWNLOAD_DELAY", source.rate_limit_delay_seconds, priority="cmdline")
         settings.set("CONCURRENT_REQUESTS_PER_DOMAIN", source.max_concurrency, priority="cmdline")
@@ -229,7 +223,8 @@ async def orchestrate(args: argparse.Namespace) -> None:
         runner = CrawlerRunner(settings)
         log.info("spider_pass_started", source=source.slug, job=crawl_job_id)
         deferred = runner.crawl(
-            spider_cls,
+            NewsSpiderBase,
+            name=source.slug,
             source_config=source.model_dump_json(),
             batch_size=args.batch_size,
             crawl_job_id=crawl_job_id,
@@ -237,7 +232,6 @@ async def orchestrate(args: argparse.Namespace) -> None:
         )
         await deferred.asFuture(loop)
         log.info("spider_pass_finished", source=source.slug, job=crawl_job_id)
-        return True
 
     try:
         await heartbeat.start()
