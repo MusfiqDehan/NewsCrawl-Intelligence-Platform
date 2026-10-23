@@ -1,4 +1,4 @@
-# NewsCrawl Intelligence Platform
+# NewsCrawl - News Scraping Intelligence Platform
 
 **Live demo:** [https://newscrawl.musfiqdehan.com/](https://newscrawl.musfiqdehan.com/)
 
